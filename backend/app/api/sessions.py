@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.reports import compute_class_attendance_stats
 from app.core.authz import ensure_class_access
 from app.core.config import settings
 from app.core.security import require_roles
@@ -201,14 +202,22 @@ def close_session(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_roles("lecturer", "admin")),
 ):
-    """Dong phien: SV chua co record -> absent."""
+    """Dong phien: SV chua co record -> absent. Tra kem danh sach SV vua vuot
+    nguong canh bao chuyen can do phien nay (so voi truoc khi dong)."""
     session = _get_session_or_404(db, session_id)
     ensure_class_access(user, session.schedule.class_id, db)
+    class_id = session.schedule.class_id
+
+    # Chup lai trang thai canh bao TRUOC khi dong phien, de sau do biet SV nao
+    # "vua" vuot nguong (co the vi bi diem danh vang hoac chi vi tong so buoi tang len).
+    warned_before = {
+        r["student_id"] for r in compute_class_attendance_stats(db, class_id) if r["warning"]
+    }
 
     checked_ids = {r.student_id for r in session.records}
     enrolled = (
         db.query(models.Enrollment)
-        .filter_by(class_id=session.schedule.class_id)
+        .filter_by(class_id=class_id)
         .all()
     )
     absent_count = 0
@@ -222,8 +231,13 @@ def close_session(
     session.closed_at = datetime.now()
     db.commit()
     _confirm_counts.pop(session_id, None)
+
+    newly_warned = [
+        r for r in compute_class_attendance_stats(db, class_id)
+        if r["warning"] and r["student_id"] not in warned_before
+    ]
     return {"ok": True, "absent": absent_count,
-            "present": len(checked_ids)}
+            "present": len(checked_ids), "newly_warned": newly_warned}
 
 
 @router.get("/{session_id}/records", response_model=list[schemas.RecordOut])

@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     ANTISPOOF_THRESHOLD: float = 0.5      # diem "that" toi thieu de coi la mat that
     ANTISPOOF_MODEL_PATH: str = "./models/2.7_80x80_MiniFASNetV2.onnx"
     CONFIRM_FRAMES: int = 2                # so frame can nhan dien du de ghi attendance record
+    ABSENCE_WARN_RATIO: float = 0.2        # ti le vang (khong tinh excused) -> canh bao cam thi
 
     class Config:
         env_file = ".env"
