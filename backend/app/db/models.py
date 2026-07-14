@@ -129,6 +129,8 @@ class FaceEmbedding(Base):
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     embedding: Mapped[list[float]] = mapped_column(Vector(512))
     source_image: Mapped[str] = mapped_column(String(500), default="")
+    status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | approved | rejected
+    reject_reason: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     student: Mapped[Student] = relationship(back_populates="embeddings")
