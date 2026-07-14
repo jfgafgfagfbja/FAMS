@@ -1,41 +1,47 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Clock, MapPin } from '@phosphor-icons/react'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  Clock, MapPin, CalendarCheck, ClipboardText, WarningCircle,
+  CalendarBlank, ChartBar,
+} from '@phosphor-icons/react'
 import api from '../api'
+import StatCard from '../components/StatCard'
+import { formatSemester } from '../utils/format'
 
-const WEEKDAYS = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7', 'Chủ nhật']
-
-/** Chuyen doi thu JS (0=CN..6=T7) sang quy uoc backend (0=T2..6=CN). */
-function todayBackendWeekday() {
-  const jsDay = new Date().getDay()
-  return (jsDay + 6) % 7
-}
-
-/** Dashboard giang vien: lop minh day + lich day hom nay + mo phien diem danh. */
+/** Dashboard giang vien: the dem nhanh + lich day hom nay + mo phien diem danh + shortcut. */
 export default function LecturerDashboard() {
   const navigate = useNavigate()
-  const [classes, setClasses] = useState(null)
-  const [todaySchedules, setTodaySchedules] = useState([])
+  const [me, setMe] = useState(null)
+  const [todaySchedules, setTodaySchedules] = useState(null)
+  const [openCount, setOpenCount] = useState(0)
+  const [warningCount, setWarningCount] = useState(0)
   const [opening, setOpening] = useState(null)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      const { data: myClasses } = await api.get('/classes', { params: { mine: true } })
+      const [{ data: meData }, { data: today }, { data: openSessions }] = await Promise.all([
+        api.get('/auth/me'),
+        api.get('/lecturers/me/today-schedules'),
+        api.get('/sessions', { params: { status: 'open', mine: true } }),
+      ])
       if (cancelled) return
-      setClasses(myClasses)
+      setMe(meData)
+      setTodaySchedules(today)
+      setOpenCount(openSessions.length)
 
-      const todayWd = todayBackendWeekday()
-      const entries = await Promise.all(
-        myClasses.map(async (c) => {
-          const { data: schedules } = await api.get(`/classes/${c.id}/schedules`)
-          return schedules
-            .filter((s) => s.weekday === todayWd)
-            .map((s) => ({ ...s, class_code: c.class_code, subject_name: c.subject_name }))
+      const warningLists = await Promise.all(
+        meData.classes.map(async (c) => {
+          try {
+            const { data } = await api.get('/reports/attendance/warnings', { params: { class_id: c.id } })
+            return data.map((r) => r.student_id)
+          } catch {
+            return []
+          }
         }),
       )
-      if (!cancelled) setTodaySchedules(entries.flat())
+      if (!cancelled) setWarningCount(new Set(warningLists.flat()).size)
     }
 
     load()
@@ -57,19 +63,53 @@ export default function LecturerDashboard() {
     }
   }
 
-  if (classes === null) {
-    return <div className="card skeleton" style={{ height: 200 }} />
+  if (!me || !todaySchedules) {
+    return (
+      <div>
+        <div className="stat-grid stat-grid-3">
+          {[0, 1, 2].map((i) => <div key={i} className="card stat-card skeleton" style={{ height: 112 }} />)}
+        </div>
+        <div className="card skeleton" style={{ height: 200 }} />
+      </div>
+    )
   }
 
   return (
     <div>
+      <div className="stat-grid stat-grid-3">
+        <StatCard icon={CalendarCheck} label="Buổi dạy hôm nay" value={todaySchedules.length} tint="accent" to="/schedule" />
+        <StatCard icon={ClipboardText} label="Phiên đang mở" value={openCount} tint="accent" to="/sessions" />
+        <StatCard
+          icon={WarningCircle}
+          label="SV vượt ngưỡng vắng"
+          value={warningCount}
+          tint={warningCount > 0 ? 'danger' : 'success'}
+          to="/reports"
+        />
+      </div>
+
+      <div className="shortcut-grid">
+        <Link to="/schedule" className="card shortcut-card">
+          <span className="shortcut-icon"><CalendarBlank size={22} weight="bold" /></span>
+          Lịch dạy
+        </Link>
+        <Link to="/reports" className="card shortcut-card">
+          <span className="shortcut-icon"><ChartBar size={22} weight="bold" /></span>
+          Báo cáo
+        </Link>
+        <Link to="/sessions" className="card shortcut-card">
+          <span className="shortcut-icon"><ClipboardText size={22} weight="bold" /></span>
+          Phiên đang mở
+        </Link>
+      </div>
+
       <div className="card" style={{ padding: 20, marginBottom: 20 }}>
         <h3 style={{ marginTop: 0, fontSize: 15 }}>Lịch dạy hôm nay</h3>
         {todaySchedules.length ? (
           <div style={{ display: 'grid', gap: 4 }}>
             {todaySchedules.map((s) => (
               <div
-                key={s.id}
+                key={s.schedule_id}
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '12px 0', borderBottom: '1px solid var(--border)',
@@ -85,18 +125,19 @@ export default function LecturerDashboard() {
                 </div>
                 <button
                   className="btn btn-primary"
-                  onClick={() => openSession(s.id)}
-                  disabled={opening === s.id}
+                  onClick={() => openSession(s.schedule_id)}
+                  disabled={opening === s.schedule_id}
                 >
-                  {opening === s.id ? 'Đang mở…' : 'Mở phiên điểm danh'}
+                  {opening === s.schedule_id ? 'Đang mở…' : 'Mở phiên điểm danh'}
                 </button>
               </div>
             ))}
           </div>
         ) : (
-          <p style={{ color: 'var(--text-muted)', fontSize: 13.5, margin: 0 }}>
-            Hôm nay ({WEEKDAYS[todayBackendWeekday()]}) không có lịch dạy.
-          </p>
+          <div className="empty-state">
+            <CalendarBlank size={28} />
+            <p>Hôm nay không có lịch dạy.</p>
+          </div>
         )}
       </div>
 
@@ -112,14 +153,14 @@ export default function LecturerDashboard() {
               </tr>
             </thead>
             <tbody>
-              {classes.map((c) => (
+              {me.classes.map((c) => (
                 <tr key={c.id}>
                   <td>{c.class_code}</td>
                   <td>{c.subject_name}</td>
-                  <td>{c.semester}</td>
+                  <td>{formatSemester(c.semester)}</td>
                 </tr>
               ))}
-              {!classes.length && (
+              {!me.classes.length && (
                 <tr>
                   <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                     Chưa được phân công lớp học phần nào

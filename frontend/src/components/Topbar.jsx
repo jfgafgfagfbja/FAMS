@@ -1,6 +1,6 @@
-import { useLocation } from 'react-router-dom'
-import { Sun, Moon } from '@phosphor-icons/react'
-import { getNavItems } from '../nav'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { MagnifyingGlass, Sun, Moon } from '@phosphor-icons/react'
 
 const ROLE_LABELS = {
   admin: 'Quản trị viên',
@@ -8,26 +8,41 @@ const ROLE_LABELS = {
   student: 'Sinh viên',
 }
 
-const EXTRA_TITLES = [
-  { prefix: '/attendance/', label: 'Điểm danh' },
-  { prefix: '/sessions/', label: 'Kết quả điểm danh' },
-]
-
+/** Header toan trang: logo + tim kiem (chi admin, tra ve trang quan tri Sinh vien) + user. */
 export default function Topbar({ theme, onToggleTheme }) {
-  const location = useLocation()
+  const navigate = useNavigate()
   const role = sessionStorage.getItem('role') || ''
-  const navItems = getNavItems(role)
-  const current = navItems.find((item) =>
-    item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path),
-  )
-  const extra = EXTRA_TITLES.find((t) => location.pathname.startsWith(t.prefix))
   const email = sessionStorage.getItem('email') || ''
   const initials = email ? email.slice(0, 2).toUpperCase() : '?'
+  const [query, setQuery] = useState('')
+  const canSearch = role === 'admin'
+
+  const submitSearch = (e) => {
+    e.preventDefault()
+    if (!query.trim()) return
+    navigate(`/admin/students?q=${encodeURIComponent(query.trim())}`)
+  }
 
   return (
-    <header className="topbar">
-      <div className="topbar-title">{current?.label || extra?.label || 'FAMS'}</div>
-      <div className="topbar-actions">
+    <header className="app-header">
+      <Link to="/" className="app-logo">
+        <span className="app-logo-mark">FA</span>
+        FAMS
+      </Link>
+
+      {canSearch && (
+        <form className="header-search-wrap" onSubmit={submitSearch}>
+          <MagnifyingGlass size={16} className="header-search-icon" />
+          <input
+            type="search"
+            placeholder="Tìm sinh viên theo tên hoặc MSSV…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </form>
+      )}
+
+      <div className="header-actions">
         <button className="icon-btn" onClick={onToggleTheme} aria-label="Đổi giao diện sáng/tối">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { getNavItems } from './nav'
 
 describe('getNavItems', () => {
-  it('gives students only their own attendance and enroll pages', () => {
+  it('gives students their own study menu', () => {
     const items = getNavItems('student').map((i) => i.path)
-    expect(items).toEqual(['/', '/enroll'])
+    expect(items).toEqual(['/', '/schedule', '/my-attendance', '/enroll'])
   })
 
   it('does not expose a standalone session-opening attendance link to anyone', () => {
@@ -15,14 +15,15 @@ describe('getNavItems', () => {
     expect(getNavItems('admin').some((i) => i.path === '/attendance')).toBe(false)
   })
 
-  it('gives lecturers the dashboard and enroll pages', () => {
+  it('gives lecturers the teaching-focused menu', () => {
     const items = getNavItems('lecturer').map((i) => i.path)
-    expect(items).toEqual(['/', '/enroll'])
+    expect(items).toEqual(['/', '/schedule', '/sessions', '/reports'])
   })
 
-  it('gives admins the lecturer nav plus student and class management', () => {
+  it('gives admins student/lecturer/class/schedule management plus face review', () => {
     const adminPaths = getNavItems('admin').map((i) => i.path)
-    const lecturerPaths = getNavItems('lecturer').map((i) => i.path)
-    expect(adminPaths).toEqual([...lecturerPaths, '/students', '/classes'])
+    expect(adminPaths).toEqual([
+      '/', '/admin/students', '/admin/lecturers', '/admin/classes', '/admin/schedules', '/face-review',
+    ])
   })
 })

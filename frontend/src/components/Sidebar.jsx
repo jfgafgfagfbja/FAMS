@@ -1,16 +1,19 @@
 import { NavLink } from 'react-router-dom'
-import { SignOut } from '@phosphor-icons/react'
+import { CaretLineLeft, SignOut } from '@phosphor-icons/react'
 import { getNavItems } from '../nav'
 
-export default function Sidebar({ onLogout }) {
+export default function Sidebar({ collapsed, onToggleCollapse, onLogout }) {
   const navItems = getNavItems(sessionStorage.getItem('role'))
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <span className="sidebar-logo-mark">FA</span>
-        FAMS
-      </div>
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+      <button
+        className="sidebar-collapse-btn"
+        onClick={onToggleCollapse}
+        aria-label={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+      >
+        <CaretLineLeft size={16} />
+      </button>
 
       <nav className="sidebar-nav">
         {navItems.map(({ path, label, icon: Icon }) => (
@@ -18,18 +21,24 @@ export default function Sidebar({ onLogout }) {
             key={path}
             to={path}
             end={path === '/'}
+            title={collapsed ? label : undefined}
             className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
           >
             <Icon size={18} weight="regular" />
-            {label}
+            <span className="sidebar-link-label">{label}</span>
           </NavLink>
         ))}
       </nav>
 
       <div className="sidebar-footer">
-        <button className="sidebar-link" style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer' }} onClick={onLogout}>
+        <button
+          className="sidebar-link"
+          style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer' }}
+          onClick={onLogout}
+          title={collapsed ? 'Đăng xuất' : undefined}
+        >
           <SignOut size={18} />
-          Đăng xuất
+          <span className="sidebar-link-label">Đăng xuất</span>
         </button>
       </div>
     </aside>

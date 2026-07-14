@@ -14,8 +14,8 @@ describe('Login', () => {
     sessionStorage.clear()
   })
 
-  it('shows an error message when login fails', async () => {
-    api.post.mockRejectedValueOnce(new Error('401'))
+  it('shows a wrong-credentials message on 401', async () => {
+    api.post.mockRejectedValueOnce({ response: { status: 401 } })
     render(
       <MemoryRouter>
         <Login />
@@ -28,6 +28,21 @@ describe('Login', () => {
 
     await waitFor(() => expect(screen.getByText(/sai email hoặc mật khẩu/i)).toBeInTheDocument())
     expect(sessionStorage.getItem('token')).toBeNull()
+  })
+
+  it('shows a rate-limit message on 429', async () => {
+    api.post.mockRejectedValueOnce({ response: { status: 429 } })
+    render(
+      <MemoryRouter>
+        <Login />
+      </MemoryRouter>,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('ten@fams.edu.vn'), { target: { value: 'a@b.com' } })
+    fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'wrong' } })
+    fireEvent.click(screen.getByRole('button', { name: /đăng nhập/i }))
+
+    await waitFor(() => expect(screen.getByText(/đăng nhập sai quá nhiều lần/i)).toBeInTheDocument())
   })
 
   it('stores the token, role, and email on success', async () => {

@@ -21,8 +21,14 @@ export default function Login() {
       sessionStorage.setItem('email', email)
       navigate('/')
       window.location.reload()
-    } catch {
-      setError('Sai email hoặc mật khẩu.')
+    } catch (err) {
+      if (err.response?.status === 429) {
+        setError('Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.')
+      } else if (err.response?.status === 401) {
+        setError('Sai email hoặc mật khẩu.')
+      } else {
+        setError('Không thể đăng nhập lúc này. Vui lòng thử lại.')
+      }
     } finally {
       setLoading(false)
     }
@@ -32,12 +38,12 @@ export default function Login() {
     <div className="auth-shell">
       <form onSubmit={submit} className="card auth-card">
         <div>
-          <div className="sidebar-logo" style={{ marginBottom: 4 }}>
-            <span className="sidebar-logo-mark">FA</span>
+          <div className="app-logo" style={{ marginBottom: 4 }}>
+            <span className="app-logo-mark">FA</span>
             FAMS
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: 13.5, margin: '4px 0 0' }}>
-            Hệ thống điểm danh bằng khuôn mặt
+            Trường Đại học Kiến trúc Đà Nẵng — Hệ thống điểm danh bằng khuôn mặt
           </p>
         </div>
 
