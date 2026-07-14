@@ -188,6 +188,17 @@ def manual_check(
     session = _get_session_or_404(db, session_id)
     ensure_class_access(user, session.schedule.class_id, db)
 
+    # Chan trung truoc khi insert - UniqueConstraint(session_id, student_id) o DB
+    # se chan o tang du lieu, nhung khong bat truoc thi se lo ra IntegrityError 500
+    # thay vi 1 loi 400 de hieu.
+    existed = (
+        db.query(models.AttendanceRecord)
+        .filter_by(session_id=session_id, student_id=body.student_id)
+        .first()
+    )
+    if existed:
+        raise HTTPException(400, "Sinh vien nay da co record trong phien nay")
+
     record = models.AttendanceRecord(
         session_id=session_id, student_id=body.student_id, status="manual")
     db.add(record)
