@@ -74,13 +74,30 @@ async def recognize(
     evidence_path = None
     results = []
     for m in matches:
-        if m["student_id"] is None:
+        is_spoof = m.get("is_spoof", False)
+        liveness_score = m.get("liveness_score")
+        student = db.get(models.Student, m["student_id"]) if m["student_id"] else None
+
+        if is_spoof:
+            # Nghi gia mao: van luu anh bang chung de admin xem lai ai gian lan,
+            # nhung khong ghi attendance record du co nhan ra danh tinh hay khong.
+            if evidence_path is None:
+                evidence_path = _save_evidence(data, session_id)
             results.append(schemas.RecognizeResult(
-                student_id=None, student_code=None, full_name=None,
-                confidence=m["confidence"], status="unknown", evidence_image=None))
+                student_id=student.id if student else None,
+                student_code=student.student_code if student else None,
+                full_name=student.user.full_name if student else None,
+                confidence=m["confidence"], status="spoof",
+                evidence_image=evidence_path, liveness_score=liveness_score))
             continue
 
-        student = db.get(models.Student, m["student_id"])
+        if student is None:
+            results.append(schemas.RecognizeResult(
+                student_id=None, student_code=None, full_name=None,
+                confidence=m["confidence"], status="unknown", evidence_image=None,
+                liveness_score=liveness_score))
+            continue
+
         existed = (
             db.query(models.AttendanceRecord)
             .filter_by(session_id=session_id, student_id=student.id)
@@ -109,7 +126,7 @@ async def recognize(
             student_id=student.id, student_code=student.student_code,
             full_name=student.user.full_name,
             confidence=m["confidence"], status=status,
-            evidence_image=evidence or None))
+            evidence_image=evidence or None, liveness_score=liveness_score))
     return results
 
 

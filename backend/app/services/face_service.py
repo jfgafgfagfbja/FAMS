@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db import models
+from app.services import antispoof_service
 
 MIN_FACE_SIZE = 112          # pixel, mat nho hon -> tu choi
 MIN_BRIGHTNESS = 40          # do sang trung binh toi thieu
@@ -73,6 +74,11 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
     if err:
         return False, err
 
+    if settings.ANTISPOOF_ENABLED:
+        is_real, liveness_score = antispoof_service.check_liveness(img, face.bbox)
+        if not is_real:
+            return False, f"Anh nghi la gia mao (anh in/anh chup lai), diem that: {liveness_score}"
+
     emb = face.normed_embedding.astype(np.float32)
 
     # Kiem tra trung voi sinh vien khac
@@ -100,7 +106,11 @@ def recognize_frame(
 ) -> list[dict]:
     """Nhan dien tat ca khuon mat trong frame, chi so khop voi SV thuoc lop class_id.
 
-    Tra ve list: [{student_id | None, confidence, bbox}]
+    Moi khuon mat deu duoc kiem tra liveness (chong gia mao). Van co gang nhan dien
+    danh tinh ke ca khi bi nghi gia mao (de admin biet ai co gang gian lan) - noi goi
+    (api/sessions.py) se quyet dinh khong ghi attendance record khi is_spoof=True.
+
+    Tra ve list: [{student_id | None, confidence, bbox, is_spoof, liveness_score}]
     """
     img = _decode_image(image_bytes)
     faces = get_engine().get(img)
@@ -115,14 +125,23 @@ def recognize_frame(
         .filter(models.Enrollment.class_id == class_id)
         .all()
     )
-    if not rows:
-        return [{"student_id": None, "confidence": 0.0} for _ in faces]
-
-    gallery = np.array([np.array(r[0].embedding) for r in rows])  # (N, 512)
+    gallery = np.array([np.array(r[0].embedding) for r in rows]) if rows else None
     gallery_ids = [r[1] for r in rows]
 
     results = []
     for face in faces:
+        is_real, liveness_score = (True, 1.0)
+        if settings.ANTISPOOF_ENABLED:
+            is_real, liveness_score = antispoof_service.check_liveness(img, face.bbox)
+
+        if gallery is None:
+            results.append({
+                "student_id": None, "confidence": 0.0,
+                "bbox": face.bbox.astype(int).tolist(),
+                "is_spoof": not is_real, "liveness_score": liveness_score,
+            })
+            continue
+
         emb = face.normed_embedding.astype(np.float32)
         sims = gallery @ emb / (
             np.linalg.norm(gallery, axis=1) * np.linalg.norm(emb) + 1e-8
@@ -133,5 +152,7 @@ def recognize_frame(
             "student_id": gallery_ids[best] if conf >= settings.RECOGNITION_THRESHOLD else None,
             "confidence": round(conf, 3),
             "bbox": face.bbox.astype(int).tolist(),
+            "is_spoof": not is_real,
+            "liveness_score": liveness_score,
         })
     return results

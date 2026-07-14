@@ -126,8 +126,9 @@ class RecognizeResult(BaseModel):
     student_code: str | None
     full_name: str | None
     confidence: float
-    status: str  # recognized | unknown | already_checked
+    status: str  # recognized | unknown | already_checked | spoof
     evidence_image: str | None = None  # URL /evidence/... lam bang chung
+    liveness_score: float | None = None  # diem "mat that" tu anti-spoofing
 
 
 class RecordOut(BaseModel):

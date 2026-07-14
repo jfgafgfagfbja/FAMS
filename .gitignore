@@ -2,6 +2,8 @@ backend/venv/
 backend/.env
 backend/evidence/
 backend/.pytest_cache/
+backend/models/*.onnx
+backend/models/*.pth
 **/__pycache__/
 *.pyc
 

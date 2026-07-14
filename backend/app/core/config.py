@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     EVIDENCE_DIR: str = "./evidence"
     EVIDENCE_RETENTION_DAYS: int = 90     # anh bang chung qua han bi xoa tu dong
     CORS_ORIGINS: str = "http://localhost:5173"  # phan cach boi dau phay
+    ANTISPOOF_ENABLED: bool = True        # bat/tat kiem tra liveness (tat khi may dev yeu)
+    ANTISPOOF_THRESHOLD: float = 0.5      # diem "that" toi thieu de coi la mat that
+    ANTISPOOF_MODEL_PATH: str = "./models/2.7_80x80_MiniFASNetV2.onnx"
 
     class Config:
         env_file = ".env"

@@ -12,12 +12,14 @@ from app.api import auth, classes, faces, lecturers, reports, sessions, students
 from app.api.auth import limiter
 from app.core.config import settings
 from app.db.database import init_db
+from app.services import antispoof_service
 from app.services.evidence_cleanup import run_cleanup_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    antispoof_service.warm_up()  # log canh bao ngay neu chua co model, thay vi doi request dau
     cleanup_task = asyncio.create_task(run_cleanup_loop())
     yield
     cleanup_task.cancel()
