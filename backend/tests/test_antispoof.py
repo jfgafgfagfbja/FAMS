@@ -103,7 +103,8 @@ def test_spoof_does_not_create_attendance_record(client, seed, monkeypatch):
     assert records.json() == []
 
 
-def test_real_face_creates_attendance_record(client, seed, monkeypatch):
+def test_real_face_creates_attendance_record_after_confirm_frames(client, seed, monkeypatch):
+    """Mac dinh CONFIRM_FRAMES=2: frame dau tra ve "confirming", frame thu 2 moi ghi record."""
     token, session_id = _open_session(client, seed)
 
     monkeypatch.setattr(face_service, "recognize_frame", lambda db, data, class_id: [
@@ -111,13 +112,27 @@ def test_real_face_creates_attendance_record(client, seed, monkeypatch):
          "is_spoof": False, "liveness_score": 0.95},
     ])
 
-    resp = client.post(
+    resp1 = client.post(
         f"/sessions/{session_id}/recognize",
         files={"frame": ("frame.jpg", b"fake", "image/jpeg")},
         headers=auth_headers(token),
     )
-    assert resp.status_code == 200
-    assert resp.json()[0]["status"] == "recognized"
+    assert resp1.status_code == 200
+    body1 = resp1.json()[0]
+    assert body1["status"] == "confirming"
+    assert body1["confirm_count"] == 1
+    assert body1["confirm_needed"] == 2
+
+    records_after_1 = client.get(f"/sessions/{session_id}/records", headers=auth_headers(token))
+    assert records_after_1.json() == []
+
+    resp2 = client.post(
+        f"/sessions/{session_id}/recognize",
+        files={"frame": ("frame.jpg", b"fake", "image/jpeg")},
+        headers=auth_headers(token),
+    )
+    assert resp2.status_code == 200
+    assert resp2.json()[0]["status"] == "recognized"
 
     records = client.get(f"/sessions/{session_id}/records", headers=auth_headers(token))
     assert len(records.json()) == 1

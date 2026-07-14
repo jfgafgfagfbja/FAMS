@@ -141,10 +141,12 @@ class RecognizeResult(BaseModel):
     student_code: str | None
     full_name: str | None
     confidence: float
-    status: str  # recognized | unknown | already_checked | spoof
+    status: str  # recognized | unknown | already_checked | spoof | confirming
     evidence_image: str | None = None  # URL /evidence/... lam bang chung
     liveness_score: float | None = None  # diem "mat that" tu anti-spoofing
     bbox: list[int] | None = None  # [x1, y1, x2, y2] de frontend ve overlay
+    confirm_count: int | None = None  # so frame da nhan dien trong phien (status=confirming)
+    confirm_needed: int | None = None  # so frame can de xac nhan (settings.CONFIRM_FRAMES)
 
 
 class RecordOut(BaseModel):

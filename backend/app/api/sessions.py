@@ -15,6 +15,12 @@ from app.services import face_service
 
 router = APIRouter(prefix="/sessions", tags=["attendance"])
 
+# Dem so frame da nhan dien duoc 1 SV trong 1 phien, truoc khi ghi attendance record
+# (multi-frame confirmation - giam nhan nham). Luu in-memory theo session_id, KHONG
+# ben vung: mat het khi restart server (chap nhan duoc vi chi anh huong phien dang
+# mo tai thoi diem restart, SV se phai duoc nhan dien lai tu dau). Don khi dong phien.
+_confirm_counts: dict[int, dict[int, int]] = {}
+
 
 def _save_evidence(image_bytes: bytes, session_id: int) -> str:
     """Luu frame lam bang chung, tra ve duong dan tuong doi (de dung voi /evidence/...)."""
@@ -124,10 +130,28 @@ async def recognize(
             .filter_by(session_id=session_id, student_id=student.id)
             .first()
         )
+        confirm_count = confirm_needed = None
         if existed:
             status = "already_checked"
             evidence = existed.evidence_image
         else:
+            # Chi ghi record khi da nhan dien du CONFIRM_FRAMES lan trong phien nay
+            # (khong can lien tiep) - giam nhan nham do 1 frame loi thoang qua.
+            session_counts = _confirm_counts.setdefault(session_id, {})
+            session_counts[student.id] = session_counts.get(student.id, 0) + 1
+            confirm_count = session_counts[student.id]
+            confirm_needed = settings.CONFIRM_FRAMES
+
+            if confirm_count < confirm_needed:
+                results.append(schemas.RecognizeResult(
+                    student_id=student.id, student_code=student.student_code,
+                    full_name=student.user.full_name,
+                    confidence=m["confidence"], status="confirming",
+                    evidence_image=None, liveness_score=liveness_score,
+                    bbox=m.get("bbox"), confirm_count=confirm_count,
+                    confirm_needed=confirm_needed))
+                continue
+
             # Dung gio hay muon: so voi gio bat dau tiet + LATE_AFTER_MINUTES
             start = datetime.combine(session.session_date,
                                      session.schedule.start_time)
@@ -148,7 +172,7 @@ async def recognize(
             full_name=student.user.full_name,
             confidence=m["confidence"], status=status,
             evidence_image=evidence or None, liveness_score=liveness_score,
-            bbox=m.get("bbox")))
+            bbox=m.get("bbox"), confirm_count=confirm_count, confirm_needed=confirm_needed))
     return results
 
 
@@ -197,6 +221,7 @@ def close_session(
     session.status = "closed"
     session.closed_at = datetime.now()
     db.commit()
+    _confirm_counts.pop(session_id, None)
     return {"ok": True, "absent": absent_count,
             "present": len(checked_ids)}
 

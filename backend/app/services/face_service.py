@@ -53,10 +53,6 @@ def _check_quality(img: np.ndarray, face) -> str | None:
     return None
 
 
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-8))
-
-
 # ---------------- ENROLLMENT ----------------
 
 def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool, str]:
@@ -81,16 +77,21 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
 
     emb = face.normed_embedding.astype(np.float32)
 
-    # Kiem tra trung voi sinh vien khac
-    others = (
-        db.query(models.FaceEmbedding)
+    # Kiem tra trung voi sinh vien khac: de pgvector tim embedding gan nhat qua
+    # toan tu <=> (cosine distance) thay vi tai het ve tinh bang numpy.
+    # similarity = 1 - distance.
+    distance = models.FaceEmbedding.embedding.cosine_distance(emb.tolist())
+    nearest = (
+        db.query(models.FaceEmbedding.student_id, distance.label("distance"))
         .filter(models.FaceEmbedding.student_id != student_id)
-        .all()
+        .order_by(distance)
+        .first()
     )
-    for other in others:
-        if cosine_similarity(emb, np.array(other.embedding)) > settings.DUPLICATE_THRESHOLD:
+    if nearest is not None:
+        other_student_id, dist = nearest
+        if 1 - dist > settings.DUPLICATE_THRESHOLD:
             return False, (
-                f"Khuon mat qua giong sinh vien id={other.student_id} da dang ky. "
+                f"Khuon mat qua giong sinh vien id={other_student_id} da dang ky. "
                 "Can admin xac minh."
             )
 
@@ -117,24 +118,26 @@ def recognize_frame(
     if not faces:
         return []
 
-    # Lay embedding cua SV trong lop (gioi han pham vi tim kiem)
-    rows = (
-        db.query(models.FaceEmbedding, models.Enrollment.student_id)
-        .join(models.Enrollment,
-              models.Enrollment.student_id == models.FaceEmbedding.student_id)
-        .filter(models.Enrollment.class_id == class_id)
-        .all()
-    )
-    gallery = np.array([np.array(r[0].embedding) for r in rows]) if rows else None
-    gallery_ids = [r[1] for r in rows]
-
     results = []
     for face in faces:
         is_real, liveness_score = (True, 1.0)
         if settings.ANTISPOOF_ENABLED:
             is_real, liveness_score = antispoof_service.check_liveness(img, face.bbox)
 
-        if gallery is None:
+        # Tim embedding gan nhat (cosine distance qua toan tu <=>, dung index HNSW)
+        # chi trong so SV thuoc lop nay - gioi han pham vi tim kiem, tang toc do.
+        emb = face.normed_embedding.astype(np.float32)
+        distance = models.FaceEmbedding.embedding.cosine_distance(emb.tolist())
+        match = (
+            db.query(models.Enrollment.student_id, distance.label("distance"))
+            .join(models.FaceEmbedding,
+                  models.FaceEmbedding.student_id == models.Enrollment.student_id)
+            .filter(models.Enrollment.class_id == class_id)
+            .order_by(distance)
+            .first()
+        )
+
+        if match is None:
             results.append({
                 "student_id": None, "confidence": 0.0,
                 "bbox": face.bbox.astype(int).tolist(),
@@ -142,15 +145,11 @@ def recognize_frame(
             })
             continue
 
-        emb = face.normed_embedding.astype(np.float32)
-        sims = gallery @ emb / (
-            np.linalg.norm(gallery, axis=1) * np.linalg.norm(emb) + 1e-8
-        )
-        best = int(np.argmax(sims))
-        conf = float(sims[best])
+        student_id, dist = match
+        conf = round(1 - dist, 3)
         results.append({
-            "student_id": gallery_ids[best] if conf >= settings.RECOGNITION_THRESHOLD else None,
-            "confidence": round(conf, 3),
+            "student_id": student_id if conf >= settings.RECOGNITION_THRESHOLD else None,
+            "confidence": conf,
             "bbox": face.bbox.astype(int).tolist(),
             "is_spoof": not is_real,
             "liveness_score": liveness_score,
