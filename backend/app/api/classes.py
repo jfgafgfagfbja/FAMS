@@ -53,14 +53,65 @@ def delete_class(class_id: int, db: Session = Depends(get_db)):
 @router.post("/{class_id}/enroll/{student_id}",
              dependencies=[Depends(require_roles("admin"))])
 def enroll_student(class_id: int, student_id: int, db: Session = Depends(get_db)):
+    if db.query(models.Enrollment).filter_by(class_id=class_id, student_id=student_id).first():
+        raise HTTPException(400, "Sinh vien da ghi danh lop nay")
     db.add(models.Enrollment(class_id=class_id, student_id=student_id))
     db.commit()
     return {"ok": True}
 
 
-@router.post("/schedules", dependencies=[Depends(require_roles("admin"))])
+@router.delete("/{class_id}/enroll/{student_id}",
+               dependencies=[Depends(require_roles("admin"))])
+def unenroll_student(class_id: int, student_id: int, db: Session = Depends(get_db)):
+    enrollment = db.query(models.Enrollment).filter_by(
+        class_id=class_id, student_id=student_id).first()
+    if not enrollment:
+        raise HTTPException(404, "Sinh vien chua ghi danh lop nay")
+    db.delete(enrollment)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{class_id}/students", response_model=list[schemas.StudentOut],
+            dependencies=[Depends(require_roles("admin", "lecturer"))])
+def list_class_students(class_id: int, db: Session = Depends(get_db)):
+    students = (
+        db.query(models.Student)
+        .join(models.Enrollment, models.Enrollment.student_id == models.Student.id)
+        .filter(models.Enrollment.class_id == class_id)
+        .all()
+    )
+    return [
+        schemas.StudentOut(
+            id=s.id, student_code=s.student_code, full_name=s.user.full_name,
+            major=s.major, cohort=s.cohort, face_enrolled=len(s.embeddings) > 0,
+            consent_given=s.consent_given,
+        )
+        for s in students
+    ]
+
+
+@router.get("/{class_id}/schedules", response_model=list[schemas.ScheduleOut])
+def list_class_schedules(class_id: int, db: Session = Depends(get_db),
+                         _user: models.User = Depends(get_current_user)):
+    return db.query(models.Schedule).filter_by(class_id=class_id).all()
+
+
+@router.post("/schedules", response_model=schemas.ScheduleOut,
+             dependencies=[Depends(require_roles("admin"))])
 def create_schedule(body: schemas.ScheduleCreate, db: Session = Depends(get_db)):
     sched = models.Schedule(**body.model_dump())
     db.add(sched)
     db.commit()
-    return {"ok": True, "id": sched.id}
+    db.refresh(sched)
+    return sched
+
+
+@router.delete("/schedules/{schedule_id}", dependencies=[Depends(require_roles("admin"))])
+def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
+    sched = db.get(models.Schedule, schedule_id)
+    if not sched:
+        raise HTTPException(404, "Lich hoc khong ton tai")
+    db.delete(sched)
+    db.commit()
+    return {"ok": True}

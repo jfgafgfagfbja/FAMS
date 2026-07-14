@@ -1,4 +1,4 @@
-import { House, CalendarCheck, Camera, ClipboardText } from '@phosphor-icons/react'
+import { House, CalendarCheck, Camera, ClipboardText, Users, GraduationCap } from '@phosphor-icons/react'
 
 export function getNavItems(role) {
   if (role === 'student') {
@@ -7,9 +7,19 @@ export function getNavItems(role) {
       { path: '/enroll', label: 'Đăng ký khuôn mặt', icon: Camera },
     ]
   }
-  return [
+
+  const items = [
     { path: '/', label: 'Dashboard', icon: House },
     { path: '/attendance', label: 'Điểm danh', icon: CalendarCheck },
     { path: '/enroll', label: 'Đăng ký khuôn mặt', icon: Camera },
   ]
+
+  if (role === 'admin') {
+    items.push(
+      { path: '/students', label: 'Sinh viên', icon: Users },
+      { path: '/classes', label: 'Lớp học phần', icon: GraduationCap },
+    )
+  }
+
+  return items
 }

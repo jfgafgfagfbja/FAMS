@@ -73,6 +73,37 @@ class ScheduleCreate(BaseModel):
     room: str
 
 
+class ScheduleOut(BaseModel):
+    id: int
+    class_id: int
+    weekday: int
+    start_time: time
+    end_time: time
+    room: str
+
+    class Config:
+        from_attributes = True
+
+
+# ---- Lecturer ----
+class LecturerCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    lecturer_code: str
+    department: str = ""
+
+
+class LecturerOut(BaseModel):
+    id: int
+    lecturer_code: str
+    full_name: str
+    department: str
+
+    class Config:
+        from_attributes = True
+
+
 # ---- Attendance ----
 class SessionCreate(BaseModel):
     schedule_id: int
