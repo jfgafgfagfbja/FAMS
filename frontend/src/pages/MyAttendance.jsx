@@ -32,28 +32,33 @@ export default function MyAttendance() {
               <th>Muộn</th>
               <th>Vắng</th>
               <th>Tổng buổi</th>
+              <th>% vắng</th>
               <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.class_code}>
-                <td>
-                  {r.class_code} — {r.subject_name}
-                </td>
-                <td>{r.present + r.manual}</td>
-                <td>{r.late}</td>
-                <td>{r.absent}</td>
-                <td>{r.total_sessions}</td>
-                <td>
-                  {r.warning ? (
-                    <span className="tag tag-warning">Nguy cơ cấm thi</span>
-                  ) : (
-                    <span className="tag tag-success">Bình thường</span>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const absentPct = r.total_sessions ? Math.round((r.absent / r.total_sessions) * 1000) / 10 : 0
+              return (
+                <tr key={r.class_code}>
+                  <td>
+                    {r.class_code} — {r.subject_name}
+                  </td>
+                  <td>{r.present + r.manual}</td>
+                  <td>{r.late}</td>
+                  <td>{r.absent}</td>
+                  <td>{r.total_sessions}</td>
+                  <td>{r.total_sessions ? `${absentPct}%` : '—'}</td>
+                  <td>
+                    {r.warning ? (
+                      <span className="tag tag-warning">Nguy cơ cấm thi</span>
+                    ) : (
+                      <span className="tag tag-success">Bình thường</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

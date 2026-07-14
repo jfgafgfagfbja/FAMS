@@ -53,6 +53,26 @@ def open_session(
     return session
 
 
+@router.get("/{session_id}", response_model=schemas.SessionDetail)
+def get_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles("lecturer", "admin")),
+):
+    """Chi tiet 1 phien, kem thong tin lop/lich - frontend dung de lay class_id."""
+    session = _get_session_or_404(db, session_id)
+    ensure_class_access(user, session.schedule.class_id, db)
+
+    clazz = session.schedule.clazz
+    return schemas.SessionDetail(
+        id=session.id, schedule_id=session.schedule_id,
+        session_date=session.session_date, status=session.status,
+        class_id=clazz.id, class_code=clazz.class_code, subject_name=clazz.subject_name,
+        room=session.schedule.room, start_time=session.schedule.start_time,
+        end_time=session.schedule.end_time,
+    )
+
+
 @router.post("/{session_id}/recognize",
              response_model=list[schemas.RecognizeResult])
 async def recognize(
@@ -88,14 +108,15 @@ async def recognize(
                 student_code=student.student_code if student else None,
                 full_name=student.user.full_name if student else None,
                 confidence=m["confidence"], status="spoof",
-                evidence_image=evidence_path, liveness_score=liveness_score))
+                evidence_image=evidence_path, liveness_score=liveness_score,
+                bbox=m.get("bbox")))
             continue
 
         if student is None:
             results.append(schemas.RecognizeResult(
                 student_id=None, student_code=None, full_name=None,
                 confidence=m["confidence"], status="unknown", evidence_image=None,
-                liveness_score=liveness_score))
+                liveness_score=liveness_score, bbox=m.get("bbox")))
             continue
 
         existed = (
@@ -126,7 +147,8 @@ async def recognize(
             student_id=student.id, student_code=student.student_code,
             full_name=student.user.full_name,
             confidence=m["confidence"], status=status,
-            evidence_image=evidence or None, liveness_score=liveness_score))
+            evidence_image=evidence or None, liveness_score=liveness_score,
+            bbox=m.get("bbox")))
     return results
 
 
@@ -189,3 +211,28 @@ def list_records(
     ensure_class_access(user, session.schedule.class_id, db)
     return (db.query(models.AttendanceRecord)
             .filter_by(session_id=session_id).all())
+
+
+@router.patch("/{session_id}/records/{record_id}", response_model=schemas.RecordOut)
+def update_record(
+    session_id: int,
+    record_id: int,
+    body: schemas.RecordUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles("lecturer", "admin")),
+):
+    """Sua trang thai 1 record sau buoi hoc (vd giang vien sua nham/xac nhan lai)."""
+    session = _get_session_or_404(db, session_id)
+    ensure_class_access(user, session.schedule.class_id, db)
+
+    record = db.get(models.AttendanceRecord, record_id)
+    if not record or record.session_id != session_id:
+        raise HTTPException(404, "Record khong ton tai trong phien nay")
+
+    if body.status not in ("present", "late", "absent", "manual"):
+        raise HTTPException(400, "Trang thai khong hop le")
+
+    record.status = body.status
+    db.commit()
+    db.refresh(record)
+    return record

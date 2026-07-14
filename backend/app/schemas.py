@@ -120,6 +120,21 @@ class SessionOut(BaseModel):
         from_attributes = True
 
 
+class SessionDetail(BaseModel):
+    """Chi tiet 1 phien diem danh, kem thong tin lop/lich de frontend dung
+    (vd lay class_id de goi GET /classes/{class_id}/students lam danh sach lop)."""
+    id: int
+    schedule_id: int
+    session_date: date
+    status: str
+    class_id: int
+    class_code: str
+    subject_name: str
+    room: str
+    start_time: time
+    end_time: time
+
+
 class RecognizeResult(BaseModel):
     """Ket qua nhan dien 1 khuon mat trong frame."""
     student_id: int | None
@@ -129,6 +144,7 @@ class RecognizeResult(BaseModel):
     status: str  # recognized | unknown | already_checked | spoof
     evidence_image: str | None = None  # URL /evidence/... lam bang chung
     liveness_score: float | None = None  # diem "mat that" tu anti-spoofing
+    bbox: list[int] | None = None  # [x1, y1, x2, y2] de frontend ve overlay
 
 
 class RecordOut(BaseModel):
@@ -141,6 +157,10 @@ class RecordOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RecordUpdate(BaseModel):
+    status: str  # present | late | absent | manual
 
 
 class ManualCheck(BaseModel):

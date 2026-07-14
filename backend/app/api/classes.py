@@ -27,8 +27,17 @@ def create_class(body: schemas.ClassCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[schemas.ClassOut])
-def list_classes(db: Session = Depends(get_db), _user: models.User = Depends(get_current_user)):
-    return db.query(models.Class).all()
+def list_classes(
+    mine: bool = False,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """mine=true: giang vien chi thay lop minh day (admin/khac khong bi anh huong)."""
+    query = db.query(models.Class)
+    if mine and user.role == "lecturer":
+        lecturer = db.query(models.Lecturer).filter_by(user_id=user.id).first()
+        query = query.filter(models.Class.lecturer_id == (lecturer.id if lecturer else -1))
+    return query.all()
 
 
 @router.patch("/{class_id}", response_model=schemas.ClassOut,

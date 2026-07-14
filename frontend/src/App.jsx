@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import LecturerDashboard from './pages/LecturerDashboard'
 import MyAttendance from './pages/MyAttendance'
 import AttendanceScreen from './pages/AttendanceScreen'
+import SessionRecords from './pages/SessionRecords'
 import EnrollFace from './pages/EnrollFace'
 import Students from './pages/Students'
 import Classes from './pages/Classes'
@@ -42,14 +44,20 @@ export default function App() {
     )
   }
 
+  const HomePage = role === 'student' ? MyAttendance : role === 'lecturer' ? LecturerDashboard : Dashboard
+
   return (
     <Layout theme={theme} onToggleTheme={toggleTheme} onLogout={logout}>
       <Routes>
         <Route path="/login" element={<Navigate to="/" />} />
-        <Route path="/" element={role === 'student' ? <MyAttendance /> : <Dashboard />} />
+        <Route path="/" element={<HomePage />} />
         <Route
-          path="/attendance"
+          path="/attendance/:sessionId"
           element={role === 'student' ? <Navigate to="/" /> : <AttendanceScreen />}
+        />
+        <Route
+          path="/sessions/:sessionId/records"
+          element={role === 'student' ? <Navigate to="/" /> : <SessionRecords />}
         />
         <Route path="/enroll" element={<EnrollFace />} />
         <Route path="/students" element={role === 'admin' ? <Students /> : <Navigate to="/" />} />

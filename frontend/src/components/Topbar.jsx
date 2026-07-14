@@ -8,6 +8,11 @@ const ROLE_LABELS = {
   student: 'Sinh viên',
 }
 
+const EXTRA_TITLES = [
+  { prefix: '/attendance/', label: 'Điểm danh' },
+  { prefix: '/sessions/', label: 'Kết quả điểm danh' },
+]
+
 export default function Topbar({ theme, onToggleTheme }) {
   const location = useLocation()
   const role = sessionStorage.getItem('role') || ''
@@ -15,12 +20,13 @@ export default function Topbar({ theme, onToggleTheme }) {
   const current = navItems.find((item) =>
     item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path),
   )
+  const extra = EXTRA_TITLES.find((t) => location.pathname.startsWith(t.prefix))
   const email = sessionStorage.getItem('email') || ''
   const initials = email ? email.slice(0, 2).toUpperCase() : '?'
 
   return (
     <header className="topbar">
-      <div className="topbar-title">{current?.label || 'FAMS'}</div>
+      <div className="topbar-title">{current?.label || extra?.label || 'FAMS'}</div>
       <div className="topbar-actions">
         <button className="icon-btn" onClick={onToggleTheme} aria-label="Đổi giao diện sáng/tối">
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}

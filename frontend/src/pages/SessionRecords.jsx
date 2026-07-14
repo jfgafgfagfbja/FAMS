@@ -1,0 +1,132 @@
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import api from '../api'
+import { API_BASE_URL } from '../config'
+
+const STATUS_OPTIONS = ['present', 'late', 'absent', 'manual']
+const STATUS_LABEL = { present: 'Có mặt', late: 'Muộn', absent: 'Vắng', manual: 'Điểm danh tay' }
+
+/** Xem va sua record diem danh sau buoi hoc. */
+export default function SessionRecords() {
+  const { sessionId } = useParams()
+  const [session, setSession] = useState(null)
+  const [roster, setRoster] = useState(null)
+  const [records, setRecords] = useState([])
+  const [savingId, setSavingId] = useState(null)
+
+  const load = async () => {
+    const { data: s } = await api.get(`/sessions/${sessionId}`)
+    setSession(s)
+    const [{ data: students }, { data: recs }] = await Promise.all([
+      api.get(`/classes/${s.class_id}/students`),
+      api.get(`/sessions/${sessionId}/records`),
+    ])
+    setRoster(students)
+    setRecords(recs)
+  }
+
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId])
+
+  const updateStatus = async (recordId, status) => {
+    setSavingId(recordId)
+    try {
+      await api.patch(`/sessions/${sessionId}/records/${recordId}`, { status })
+      await load()
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const markManual = async (studentId) => {
+    await api.post(`/sessions/${sessionId}/manual`, { student_id: studentId })
+    await load()
+  }
+
+  if (!session || !roster) {
+    return <div className="card skeleton" style={{ height: 300 }} />
+  }
+
+  const recordByStudent = new Map(records.map((r) => [r.student_id, r]))
+
+  return (
+    <div>
+      <div style={{ marginBottom: 16 }}>
+        <h2 style={{ margin: 0 }}>{session.class_code} — {session.subject_name}</h2>
+        <p style={{ margin: '2px 0 0', color: 'var(--text-muted)', fontSize: 13.5 }}>
+          Phòng {session.room} · {session.session_date} · Trạng thái phiên: {session.status === 'open' ? 'Đang mở' : 'Đã đóng'}
+        </p>
+      </div>
+
+      <div className="card">
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>MSSV</th>
+                <th>Họ tên</th>
+                <th>Trạng thái</th>
+                <th>Độ tin cậy</th>
+                <th>Ảnh bằng chứng</th>
+                <th>Giờ ghi nhận</th>
+              </tr>
+            </thead>
+            <tbody>
+              {roster.map((s) => {
+                const record = recordByStudent.get(s.id)
+                return (
+                  <tr key={s.id}>
+                    <td>{s.student_code}</td>
+                    <td>{s.full_name}</td>
+                    <td>
+                      {record ? (
+                        <select
+                          className="select"
+                          value={record.status}
+                          disabled={savingId === record.id}
+                          onChange={(e) => updateStatus(record.id, e.target.value)}
+                        >
+                          {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{STATUS_LABEL[opt]}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button className="btn btn-ghost" onClick={() => markManual(s.id)}>
+                          Đánh dấu có mặt (tay)
+                        </button>
+                      )}
+                    </td>
+                    <td>{record ? record.confidence : '—'}</td>
+                    <td>
+                      {record?.evidence_image ? (
+                        <img
+                          src={`${API_BASE_URL}${record.evidence_image}`}
+                          width={44}
+                          height={44}
+                          style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
+                          alt={`Ảnh bằng chứng của ${s.full_name}`}
+                        />
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>{record ? new Date(record.checked_at).toLocaleTimeString() : '—'}</td>
+                  </tr>
+                )
+              })}
+              {!roster.length && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                    Lớp này chưa có sinh viên ghi danh
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
