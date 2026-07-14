@@ -17,7 +17,9 @@ describe('getNavItems', () => {
     expect(items).toEqual(['/', '/attendance', '/enroll'])
   })
 
-  it('gives admins the same nav as lecturers', () => {
-    expect(getNavItems('admin')).toEqual(getNavItems('lecturer'))
+  it('gives admins the lecturer nav plus student and class management', () => {
+    const adminPaths = getNavItems('admin').map((i) => i.path)
+    const lecturerPaths = getNavItems('lecturer').map((i) => i.path)
+    expect(adminPaths).toEqual([...lecturerPaths, '/students', '/classes'])
   })
 })

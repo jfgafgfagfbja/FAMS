@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import Webcam from 'react-webcam'
-import { CheckCircle, Question } from '@phosphor-icons/react'
+import { CheckCircle, Question, WarningCircle } from '@phosphor-icons/react'
 import api from '../api'
 import { API_BASE_URL as API_BASE } from '../config'
 
@@ -13,6 +13,7 @@ export default function AttendanceScreen() {
   const [session, setSession] = useState(null)
   const [results, setResults] = useState([])
   const [log, setLog] = useState([])
+  const [spoofLog, setSpoofLog] = useState([])
 
   const captureAndSend = useCallback(async () => {
     const shot = webcamRef.current?.getScreenshot()
@@ -26,6 +27,9 @@ export default function AttendanceScreen() {
       data
         .filter((r) => r.status === 'recognized')
         .forEach((r) => setLog((prev) => [r, ...prev]))
+      data
+        .filter((r) => r.status === 'spoof')
+        .forEach((r) => setSpoofLog((prev) => [{ ...r, time: new Date().toLocaleTimeString() }, ...prev]))
     } catch {
       /* phien da dong hoac loi mang */
     }
@@ -86,7 +90,15 @@ export default function AttendanceScreen() {
             <div style={{ display: 'grid', gap: 8 }}>
               {results.map((r, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5 }}>
-                  {r.status === 'unknown' ? (
+                  {r.status === 'spoof' ? (
+                    <>
+                      <WarningCircle size={16} color="var(--danger)" weight="fill" />
+                      <span style={{ color: 'var(--danger)' }}>
+                        Nghi gia mạo{r.full_name ? ` — ${r.student_code} ${r.full_name}` : ' (chưa rõ danh tính)'}
+                        {' '}<span className="tag tag-danger">liveness {r.liveness_score}</span>
+                      </span>
+                    </>
+                  ) : r.status === 'unknown' ? (
                     <>
                       <Question size={16} color="var(--text-muted)" />
                       <span style={{ color: 'var(--text-muted)' }}>Không nhận diện được (conf {r.confidence})</span>
@@ -106,6 +118,35 @@ export default function AttendanceScreen() {
             <p style={{ color: 'var(--text-muted)', fontSize: 13.5, margin: 0 }}>Đang chờ khung hình đầu tiên…</p>
           )}
         </div>
+
+        {spoofLog.length > 0 && (
+          <div className="card spoof-alert" style={{ padding: 16 }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--danger)' }}>
+              <WarningCircle size={16} weight="fill" style={{ verticalAlign: -2, marginRight: 6 }} />
+              Cảnh báo gian lận ({spoofLog.length})
+            </h3>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {spoofLog.map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {s.evidence_image && (
+                    <img
+                      src={`${API_BASE}${s.evidence_image}`}
+                      width={44}
+                      height={44}
+                      style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid var(--danger)' }}
+                      alt={`Ảnh bằng chứng nghi gian lận${s.full_name ? ` của ${s.full_name}` : ''}`}
+                    />
+                  )}
+                  <span style={{ fontSize: 13.5 }}>
+                    {s.time} —{' '}
+                    {s.full_name ? `${s.student_code} — ${s.full_name}` : 'Chưa rõ danh tính'}{' '}
+                    <span className="tag tag-danger">liveness {s.liveness_score}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="card" style={{ padding: 16 }}>
           <h3 style={{ margin: '0 0 12px', fontSize: 14 }}>Đã điểm danh</h3>

@@ -480,6 +480,16 @@ table.data-table {
   color: var(--text-muted);
 }
 
+.tag-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.spoof-alert {
+  border: 1px solid var(--danger);
+  background: var(--danger-soft);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
