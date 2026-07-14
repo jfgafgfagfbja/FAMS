@@ -79,11 +79,14 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
 
     # Kiem tra trung voi sinh vien khac: de pgvector tim embedding gan nhat qua
     # toan tu <=> (cosine distance) thay vi tai het ve tinh bang numpy.
-    # similarity = 1 - distance.
+    # similarity = 1 - distance. Chi so sanh voi embedding da duoc admin duyet -
+    # embedding dang cho duyet/da tu choi cua nguoi khac chua du tin cay de dung
+    # lam can cu bao trung.
     distance = models.FaceEmbedding.embedding.cosine_distance(emb.tolist())
     nearest = (
         db.query(models.FaceEmbedding.student_id, distance.label("distance"))
-        .filter(models.FaceEmbedding.student_id != student_id)
+        .filter(models.FaceEmbedding.student_id != student_id,
+                models.FaceEmbedding.status == "approved")
         .order_by(distance)
         .first()
     )
@@ -95,9 +98,12 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
                 "Can admin xac minh."
             )
 
-    db.add(models.FaceEmbedding(student_id=student_id, embedding=emb.tolist()))
+    # Embedding moi luon o trang thai "pending" - chi admin duyet (PATCH
+    # /faces/{id}/approve) moi duoc dung de nhan dien (xem recognize_frame).
+    db.add(models.FaceEmbedding(student_id=student_id, embedding=emb.tolist(),
+                                status="pending"))
     db.commit()
-    return True, "Dang ky thanh cong"
+    return True, "Da luu anh, dang cho quan tri vien duyet"
 
 
 # ---------------- RECOGNITION ----------------
@@ -125,14 +131,16 @@ def recognize_frame(
             is_real, liveness_score = antispoof_service.check_liveness(img, face.bbox)
 
         # Tim embedding gan nhat (cosine distance qua toan tu <=>, dung index HNSW)
-        # chi trong so SV thuoc lop nay - gioi han pham vi tim kiem, tang toc do.
+        # chi trong so SV thuoc lop nay va CHI trong embedding da duoc admin duyet -
+        # embedding cho duyet/bi tu choi khong duoc dung de nhan dien diem danh.
         emb = face.normed_embedding.astype(np.float32)
         distance = models.FaceEmbedding.embedding.cosine_distance(emb.tolist())
         match = (
             db.query(models.Enrollment.student_id, distance.label("distance"))
             .join(models.FaceEmbedding,
                   models.FaceEmbedding.student_id == models.Enrollment.student_id)
-            .filter(models.Enrollment.class_id == class_id)
+            .filter(models.Enrollment.class_id == class_id,
+                    models.FaceEmbedding.status == "approved")
             .order_by(distance)
             .first()
         )

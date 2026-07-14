@@ -36,3 +36,44 @@ def logout(
 ):
     revoke_token(db, request.state.token_payload)
     return {"ok": True}
+
+
+@router.get("/me", response_model=schemas.MeOut)
+def get_me(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Thong tin tai khoan dang dang nhap, kem ho so va danh sach lop (SV: da ghi danh,
+    GV: dang day) - frontend dung cho the thong tin ca nhan va trang lich hoc."""
+    data = {"id": user.id, "email": user.email, "full_name": user.full_name, "role": user.role}
+
+    if user.role == "student":
+        student = db.query(models.Student).filter_by(user_id=user.id).first()
+        if student:
+            data.update(
+                student_code=student.student_code, major=student.major,
+                cohort=student.cohort, consent_given=student.consent_given,
+                classes=[
+                    schemas.MeClassBrief(
+                        id=e.clazz.id, class_code=e.clazz.class_code,
+                        subject_name=e.clazz.subject_name, semester=e.clazz.semester,
+                    )
+                    for e in student.enrollments
+                ],
+            )
+    elif user.role == "lecturer":
+        lecturer = db.query(models.Lecturer).filter_by(user_id=user.id).first()
+        if lecturer:
+            classes = db.query(models.Class).filter_by(lecturer_id=lecturer.id).all()
+            data.update(
+                lecturer_code=lecturer.lecturer_code, department=lecturer.department,
+                classes=[
+                    schemas.MeClassBrief(
+                        id=c.id, class_code=c.class_code,
+                        subject_name=c.subject_name, semester=c.semester,
+                    )
+                    for c in classes
+                ],
+            )
+
+    return schemas.MeOut(**data)

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import auth, classes, faces, lecturers, reports, sessions, students
+from app.api import auth, classes, faces, lecturers, reports, schedules, sessions, students
 from app.api.auth import limiter
 from app.core.config import settings
 from app.db.database import init_db
@@ -36,10 +36,14 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # X-Total-Count: tong so ban ghi cho phan trang (GET /students, /classes,
+    # /lecturers, /schedules) - trinh duyet an het header tuy chinh tru khi khai
+    # bao o day, du server da tra ve.
+    expose_headers=["X-Total-Count"],
 )
 
 for router in (auth.router, students.router, classes.router, lecturers.router,
-               faces.router, sessions.router, reports.router):
+               faces.router, sessions.router, reports.router, schedules.router):
     app.include_router(router)
 
 os.makedirs(settings.EVIDENCE_DIR, exist_ok=True)

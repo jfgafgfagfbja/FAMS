@@ -73,6 +73,13 @@ class ScheduleCreate(BaseModel):
     room: str
 
 
+class ScheduleUpdate(BaseModel):
+    weekday: int | None = None
+    start_time: time | None = None
+    end_time: time | None = None
+    room: str | None = None
+
+
 class ScheduleOut(BaseModel):
     id: int
     class_id: int
@@ -92,6 +99,11 @@ class LecturerCreate(BaseModel):
     full_name: str
     lecturer_code: str
     department: str = ""
+
+
+class LecturerUpdate(BaseModel):
+    full_name: str | None = None
+    department: str | None = None
 
 
 class LecturerOut(BaseModel):
@@ -127,6 +139,7 @@ class SessionDetail(BaseModel):
     schedule_id: int
     session_date: date
     status: str
+    opened_at: datetime
     class_id: int
     class_code: str
     subject_name: str
@@ -184,8 +197,137 @@ class ManualCheck(BaseModel):
     student_id: int
 
 
+class RosterEntryOut(BaseModel):
+    """1 dong trong danh sach lop gop voi trang thai diem danh cua 1 phien cu the -
+    tranh FE phai goi rieng danh sach lop + danh sach record roi tu ghep (N+1)."""
+    student_id: int
+    student_code: str
+    full_name: str
+    status: str | None = None  # None = chua diem danh
+    confidence: float | None = None
+    evidence_image: str | None = None
+    checked_at: datetime | None = None
+    record_id: int | None = None
+
+
+class TodayScheduleOut(BaseModel):
+    """1 tiet hoc hom nay cua giang vien dang dang nhap."""
+    schedule_id: int
+    class_id: int
+    class_code: str
+    subject_name: str
+    weekday: int
+    start_time: time
+    end_time: time
+    room: str
+
+
+class MyAttendanceSessionOut(BaseModel):
+    """1 buoi hoc trong 1 lop, dung khi SV mo rong chi tiet tren trang chuyen can."""
+    session_id: int
+    session_date: date
+    status: str | None = None  # None = SV chua co record cho buoi nay
+    checked_at: datetime | None = None
+    confidence: float | None = None
+    evidence_image: str | None = None
+    record_id: int | None = None
+
+
+class MyClassAttendanceOut(BaseModel):
+    """Chuyen can 1 lop hoc phan trong 1 hoc ky cua chinh SV dang dang nhap."""
+    class_id: int
+    class_code: str
+    subject_name: str
+    semester: str
+    lecturer_name: str
+    lecturer_email: str
+    present: int
+    late: int
+    absent: int
+    excused: int
+    manual: int
+    total_sessions: int
+    absent_ratio: float
+    warn_ratio: float  # settings.ABSENCE_WARN_RATIO - de FE tinh nguong "sap cam thi" ma khong hardcode
+    warning: bool
+    sessions: list[MyAttendanceSessionOut]
+
+
+class ScheduleWithClassOut(BaseModel):
+    """1 lich hoc kem thong tin lop - dung cho trang quan tri /admin/schedules
+    (xem toan bo lich hoc cua truong, khong chi 1 lop)."""
+    id: int
+    class_id: int
+    class_code: str
+    subject_name: str
+    weekday: int
+    start_time: time
+    end_time: time
+    room: str
+
+
+class WeekSlotOut(BaseModel):
+    """1 o lich trong tuan (ngay cu the), gop san trang thai phien/diem danh cho
+    SV hoac GV dang dang nhap - dung cho trang /schedule, tranh FE goi N+1."""
+    date: date
+    weekday: int
+    schedule_id: int
+    class_id: int
+    class_code: str
+    subject_name: str
+    room: str
+    start_time: time
+    end_time: time
+    session_id: int | None = None
+    session_status: str | None = None  # None (chua mo phien) | open | closed
+    my_status: str | None = None  # SV: trang thai diem danh cua chinh minh (neu co)
+    present_count: int | None = None  # GV: so SV co mat khi phien da dong
+    total_count: int | None = None  # GV: tong so SV ghi danh lop
+
+
+# ---- Me ----
+class MeClassBrief(BaseModel):
+    """Thong tin rut gon 1 lop, dung trong GET /me de frontend lay lich hoc/day."""
+    id: int
+    class_code: str
+    subject_name: str
+    semester: str
+
+
+class MeOut(BaseModel):
+    """Thong tin tai khoan dang dang nhap, kem ho so va danh sach lop lien quan."""
+    id: int
+    email: str
+    full_name: str
+    role: str
+    student_code: str | None = None
+    major: str | None = None
+    cohort: int | None = None
+    consent_given: bool | None = None
+    lecturer_code: str | None = None
+    department: str | None = None
+    classes: list[MeClassBrief] = []
+
+
 # ---- Face ----
 class EnrollResult(BaseModel):
     ok: bool
     message: str
     num_embeddings: int = 0
+
+
+class FacePendingOut(BaseModel):
+    """1 embedding cho duyet, kem canh bao trung (neu co) de admin thay khi duyet."""
+    id: int
+    student_id: int
+    student_code: str
+    full_name: str
+    source_image: str
+    created_at: datetime
+    duplicate_warning: bool = False
+    duplicate_student_code: str | None = None
+    duplicate_similarity: float | None = None
+
+
+class FaceRejectBody(BaseModel):
+    reason: str

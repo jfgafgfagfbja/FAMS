@@ -1,9 +1,11 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.core.config import settings
 from app.core.security import get_current_user, hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
@@ -37,8 +39,28 @@ def create_student(body: schemas.StudentCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[schemas.StudentOut],
             dependencies=[Depends(require_roles("admin", "lecturer"))])
-def list_students(db: Session = Depends(get_db)):
-    return [_to_out(s) for s in db.query(models.Student).all()]
+def list_students(
+    response: Response,
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+):
+    """Danh sach SV, loc theo q (MSSV hoac ho ten) va phan trang qua limit/offset.
+    Khong truyen limit -> tra ve toan bo (giu tuong thich voi cac noi dang dung
+    danh sach day du, vd dropdown ghi danh). Tong so ban ghi tra qua header
+    X-Total-Count de FE dung cho phan trang ma khong doi shape response cu."""
+    query = db.query(models.Student).join(models.User, models.Student.user_id == models.User.id)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(models.Student.student_code.ilike(like),
+                                 models.User.full_name.ilike(like)))
+
+    response.headers["X-Total-Count"] = str(query.count())
+    query = query.order_by(models.Student.student_code).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    return [_to_out(s) for s in query.all()]
 
 
 @router.get("/me", response_model=schemas.StudentOut)
@@ -52,6 +74,84 @@ def get_my_student_record(
     if not student:
         raise HTTPException(404, "Khong tim thay ho so sinh vien")
     return _to_out(student)
+
+
+@router.get("/me/attendance", response_model=list[schemas.MyClassAttendanceOut])
+def get_my_attendance(
+    semester: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Chuyen can chi tiet cua chinh SV dang dang nhap, loc theo hoc ky (Class.semester,
+    dang luu dang "YYYY.N"). Khong truyen semester -> lay hoc ky moi nhat (so sanh chuoi)
+    trong cac lop da ghi danh. Gom san danh sach tung buoi hoc de FE mo rong chi tiet
+    (ngay, trang thai, gio ghi nhan, anh bang chung) trong 1 lan goi, tranh N+1."""
+    if user.role != "student":
+        raise HTTPException(403, "Chi sinh vien moi xem duoc muc nay")
+    student = db.query(models.Student).filter_by(user_id=user.id).first()
+    if not student:
+        raise HTTPException(404, "Khong tim thay ho so sinh vien")
+
+    enrollments = student.enrollments
+    if not enrollments:
+        return []
+
+    target_semester = semester or max((e.clazz.semester for e in enrollments), default=None)
+    if not target_semester:
+        return []
+
+    result = []
+    for enrollment in enrollments:
+        clazz = enrollment.clazz
+        if clazz.semester != target_semester:
+            continue
+
+        sessions = (
+            db.query(models.AttendanceSession)
+            .join(models.Schedule)
+            .filter(models.Schedule.class_id == clazz.id,
+                    models.AttendanceSession.status == "closed")
+            .order_by(models.AttendanceSession.session_date)
+            .all()
+        )
+        records_by_session = {}
+        if sessions:
+            records_by_session = {
+                r.session_id: r
+                for r in db.query(models.AttendanceRecord)
+                .filter(models.AttendanceRecord.session_id.in_([s.id for s in sessions]),
+                        models.AttendanceRecord.student_id == student.id)
+                .all()
+            }
+
+        counts = {"present": 0, "late": 0, "absent": 0, "excused": 0, "manual": 0}
+        session_details = []
+        for s in sessions:
+            r = records_by_session.get(s.id)
+            if r:
+                counts[r.status] = counts.get(r.status, 0) + 1
+            session_details.append(schemas.MyAttendanceSessionOut(
+                session_id=s.id, session_date=s.session_date,
+                status=r.status if r else None,
+                checked_at=r.checked_at if r else None,
+                confidence=r.confidence if r else None,
+                evidence_image=r.evidence_image if r else None,
+                record_id=r.id if r else None,
+            ))
+
+        total_sessions = len(sessions)
+        absent_ratio = counts["absent"] / total_sessions if total_sessions else 0
+        lecturer = db.get(models.Lecturer, clazz.lecturer_id)
+        result.append(schemas.MyClassAttendanceOut(
+            class_id=clazz.id, class_code=clazz.class_code, subject_name=clazz.subject_name,
+            semester=clazz.semester, lecturer_name=lecturer.user.full_name,
+            lecturer_email=lecturer.user.email,
+            **counts, total_sessions=total_sessions, absent_ratio=absent_ratio,
+            warn_ratio=settings.ABSENCE_WARN_RATIO,
+            warning=absent_ratio >= settings.ABSENCE_WARN_RATIO,
+            sessions=session_details,
+        ))
+    return result
 
 
 @router.get("/{student_id}", response_model=schemas.StudentOut,

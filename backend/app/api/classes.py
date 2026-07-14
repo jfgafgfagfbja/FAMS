@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
@@ -28,16 +29,40 @@ def create_class(body: schemas.ClassCreate, db: Session = Depends(get_db)):
 
 @router.get("", response_model=list[schemas.ClassOut])
 def list_classes(
+    response: Response,
     mine: bool = False,
+    q: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """mine=true: giang vien chi thay lop minh day (admin/khac khong bi anh huong)."""
+    """mine=true: giang vien chi thay lop minh day (admin/khac khong bi anh huong).
+    q loc theo ma lop/ten mon, limit/offset phan trang - khong truyen limit thi tra
+    ve toan bo nhu truoc (giu tuong thich cac noi dang dung danh sach day du, vd
+    dropdown chon lop). Tong so ban ghi tra qua header X-Total-Count."""
     query = db.query(models.Class)
     if mine and user.role == "lecturer":
         lecturer = db.query(models.Lecturer).filter_by(user_id=user.id).first()
         query = query.filter(models.Class.lecturer_id == (lecturer.id if lecturer else -1))
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(models.Class.class_code.ilike(like),
+                                 models.Class.subject_name.ilike(like)))
+
+    response.headers["X-Total-Count"] = str(query.count())
+    query = query.order_by(models.Class.class_code).offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
     return query.all()
+
+
+@router.get("/{class_id}", response_model=schemas.ClassOut)
+def get_class(class_id: int, db: Session = Depends(get_db),
+              _user: models.User = Depends(get_current_user)):
+    """Chi tiet 1 lop hoc phan - dung cho trang /admin/classes/{id} (mo truc tiep
+    qua URL/refresh, khong the dua vao danh sach da tai trong bo nho nhu truoc)."""
+    return _get_class_or_404(db, class_id)
 
 
 @router.patch("/{class_id}", response_model=schemas.ClassOut,
@@ -54,6 +79,10 @@ def update_class(class_id: int, body: schemas.ClassUpdate, db: Session = Depends
 @router.delete("/{class_id}", dependencies=[Depends(require_roles("admin"))])
 def delete_class(class_id: int, db: Session = Depends(get_db)):
     clazz = _get_class_or_404(db, class_id)
+    if db.query(models.Enrollment).filter_by(class_id=class_id).first():
+        raise HTTPException(409, "Lop hoc phan da co sinh vien ghi danh, khong the xoa truc tiep")
+    if db.query(models.Schedule).filter_by(class_id=class_id).first():
+        raise HTTPException(409, "Lop hoc phan da co lich hoc, hay xoa lich hoc truoc")
     db.delete(clazz)
     db.commit()
     return {"ok": True}
@@ -116,11 +145,27 @@ def create_schedule(body: schemas.ScheduleCreate, db: Session = Depends(get_db))
     return sched
 
 
+@router.patch("/schedules/{schedule_id}", response_model=schemas.ScheduleOut,
+              dependencies=[Depends(require_roles("admin"))])
+def update_schedule(schedule_id: int, body: schemas.ScheduleUpdate, db: Session = Depends(get_db)):
+    sched = db.get(models.Schedule, schedule_id)
+    if not sched:
+        raise HTTPException(404, "Lich hoc khong ton tai")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(sched, field, value)
+    db.commit()
+    db.refresh(sched)
+    return sched
+
+
 @router.delete("/schedules/{schedule_id}", dependencies=[Depends(require_roles("admin"))])
 def delete_schedule(schedule_id: int, db: Session = Depends(get_db)):
     sched = db.get(models.Schedule, schedule_id)
     if not sched:
         raise HTTPException(404, "Lich hoc khong ton tai")
+    if db.query(models.AttendanceSession).filter_by(schedule_id=schedule_id).first():
+        raise HTTPException(
+            409, "Lich hoc da co phien diem danh, khong the xoa truc tiep")
     db.delete(sched)
     db.commit()
     return {"ok": True}

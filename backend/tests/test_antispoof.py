@@ -33,7 +33,8 @@ def sv1_embedding(db_session, seed):
     """Tao 1 face_embedding that cho sv1, dung lam gallery de so khop."""
     emb = np.random.rand(512).astype(np.float32)
     emb = emb / np.linalg.norm(emb)
-    db_session.add(models.FaceEmbedding(student_id=seed["sv1_id"], embedding=emb.tolist()))
+    db_session.add(models.FaceEmbedding(student_id=seed["sv1_id"], embedding=emb.tolist(),
+                                        status="approved"))
     db_session.commit()
     return emb
 
