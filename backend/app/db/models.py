@@ -100,12 +100,27 @@ class AttendanceRecord(Base):
     session_id: Mapped[int] = mapped_column(ForeignKey("attendance_sessions.id"))
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     checked_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    status: Mapped[str] = mapped_column(String(10))  # present | late | absent | manual
+    status: Mapped[str] = mapped_column(String(10))  # present | late | absent | manual | excused
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     evidence_image: Mapped[str] = mapped_column(String(500), default="")
 
     session: Mapped[AttendanceSession] = relationship(back_populates="records")
     student: Mapped[Student] = relationship()
+
+
+class AttendanceAudit(Base):
+    """Luu vet moi lan giang vien/admin sua trang thai 1 attendance record."""
+    __tablename__ = "attendance_audits"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    record_id: Mapped[int] = mapped_column(ForeignKey("attendance_records.id"))
+    changed_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    old_status: Mapped[str] = mapped_column(String(10))
+    new_status: Mapped[str] = mapped_column(String(10))
+    reason: Mapped[str] = mapped_column(String(500))
+    changed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    record: Mapped[AttendanceRecord] = relationship()
+    user: Mapped[User] = relationship()
 
 
 class FaceEmbedding(Base):

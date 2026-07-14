@@ -213,6 +213,9 @@ def list_records(
             .filter_by(session_id=session_id).all())
 
 
+ALLOWED_EDIT_STATUSES = ("present", "late", "absent", "excused")
+
+
 @router.patch("/{session_id}/records/{record_id}", response_model=schemas.RecordOut)
 def update_record(
     session_id: int,
@@ -221,7 +224,9 @@ def update_record(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_roles("lecturer", "admin")),
 ):
-    """Sua trang thai 1 record sau buoi hoc (vd giang vien sua nham/xac nhan lai)."""
+    """Sua trang thai 1 record (vd SV nop don phep sau buoi hoc). Van sua duoc ke ca
+    khi phien da dong, nhung bat buoc phai co ly do - moi lan sua deu luu vao
+    AttendanceAudit de sau nay xem lai lich su."""
     session = _get_session_or_404(db, session_id)
     ensure_class_access(user, session.schedule.class_id, db)
 
@@ -229,10 +234,41 @@ def update_record(
     if not record or record.session_id != session_id:
         raise HTTPException(404, "Record khong ton tai trong phien nay")
 
-    if body.status not in ("present", "late", "absent", "manual"):
+    if body.status not in ALLOWED_EDIT_STATUSES:
         raise HTTPException(400, "Trang thai khong hop le")
+    if not body.reason.strip():
+        raise HTTPException(400, "Can nhap ly do khi sua diem danh")
 
+    old_status = record.status
     record.status = body.status
+    db.add(models.AttendanceAudit(
+        record_id=record.id, changed_by=user.id,
+        old_status=old_status, new_status=body.status, reason=body.reason.strip(),
+    ))
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.get("/{session_id}/records/{record_id}/audits",
+            response_model=list[schemas.AttendanceAuditOut])
+def list_record_audits(
+    session_id: int,
+    record_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles("lecturer", "admin")),
+):
+    """Xem lich su sua diem danh cua 1 record."""
+    session = _get_session_or_404(db, session_id)
+    ensure_class_access(user, session.schedule.class_id, db)
+
+    record = db.get(models.AttendanceRecord, record_id)
+    if not record or record.session_id != session_id:
+        raise HTTPException(404, "Record khong ton tai trong phien nay")
+
+    return (
+        db.query(models.AttendanceAudit)
+        .filter_by(record_id=record_id)
+        .order_by(models.AttendanceAudit.changed_at.desc())
+        .all()
+    )

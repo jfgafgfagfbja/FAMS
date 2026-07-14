@@ -160,7 +160,22 @@ class RecordOut(BaseModel):
 
 
 class RecordUpdate(BaseModel):
-    status: str  # present | late | absent | manual
+    """Sua trang thai 1 record sau buoi hoc. Bat buoc co ly do de luu vao AttendanceAudit."""
+    status: str  # present | late | absent | excused
+    reason: str
+
+
+class AttendanceAuditOut(BaseModel):
+    id: int
+    record_id: int
+    changed_by: int
+    old_status: str
+    new_status: str
+    reason: str
+    changed_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class ManualCheck(BaseModel):
