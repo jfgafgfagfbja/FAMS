@@ -1,0 +1,76 @@
+erDiagram
+    USERS ||--o| STUDENTS : "la"
+    USERS ||--o| LECTURERS : "la"
+    STUDENTS ||--o{ FACE_EMBEDDINGS : "co"
+    STUDENTS ||--o{ ENROLLMENTS : "dang ky"
+    CLASSES ||--o{ ENROLLMENTS : "gom"
+    LECTURERS ||--o{ CLASSES : "phu trach"
+    CLASSES ||--o{ SCHEDULES : "co lich"
+    SCHEDULES ||--o{ ATTENDANCE_SESSIONS : "mo phien"
+    ATTENDANCE_SESSIONS ||--o{ ATTENDANCE_RECORDS : "ghi nhan"
+    STUDENTS ||--o{ ATTENDANCE_RECORDS : "duoc diem danh"
+
+    USERS {
+        int id PK
+        string email UK
+        string password_hash
+        string role "admin|lecturer|student"
+        string full_name
+    }
+    STUDENTS {
+        int id PK
+        int user_id FK
+        string student_code UK
+        string major
+        int cohort
+    }
+    LECTURERS {
+        int id PK
+        int user_id FK
+        string lecturer_code UK
+        string department
+    }
+    CLASSES {
+        int id PK
+        string class_code UK
+        string subject_name
+        int lecturer_id FK
+        string semester
+    }
+    ENROLLMENTS {
+        int id PK
+        int student_id FK
+        int class_id FK
+    }
+    SCHEDULES {
+        int id PK
+        int class_id FK
+        int weekday
+        time start_time
+        time end_time
+        string room
+    }
+    ATTENDANCE_SESSIONS {
+        int id PK
+        int schedule_id FK
+        date session_date
+        datetime opened_at
+        datetime closed_at
+        string status "open|closed"
+    }
+    ATTENDANCE_RECORDS {
+        int id PK
+        int session_id FK
+        int student_id FK
+        datetime checked_at
+        string status "present|late|absent|manual"
+        float confidence
+        string evidence_image
+    }
+    FACE_EMBEDDINGS {
+        int id PK
+        int student_id FK
+        vector embedding "vector(512)"
+        string source_image
+        datetime created_at
+    }

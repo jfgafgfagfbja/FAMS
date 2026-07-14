@@ -1,0 +1,40 @@
+flowchart TB
+    subgraph Client["Client - React"]
+        A1[Dashboard Admin/GV]
+        A2[Man hinh diem danh - Webcam]
+        A3[Dang ky khuon mat - SV]
+    end
+
+    subgraph Backend["Backend - FastAPI"]
+        B1[Auth API - JWT]
+        B2[Student/Class/Schedule API]
+        B3[Attendance API]
+        B4[Face API]
+    end
+
+    subgraph FaceService["Face Service - InsightFace"]
+        C1[Detector SCRFD - phat hien mat]
+        C2[Anti-spoofing MiniFASNet]
+        C3[ArcFace - trich embedding 512d]
+        C4[Matcher - cosine similarity]
+    end
+
+    subgraph Data["PostgreSQL + pgvector"]
+        D1[(Du lieu nghiep vu)]
+        D2[(Face embeddings)]
+    end
+
+    A1 --> B1
+    A1 --> B2
+    A2 -->|frame anh| B3
+    A3 -->|anh dang ky| B4
+    B3 --> C1
+    B4 --> C1
+    C1 --> C2 --> C3
+    C3 -->|enrollment| D2
+    C3 -->|recognition| C4
+    C4 -->|truy van embedding lop| D2
+    C4 -->|ket qua| B3
+    B2 --> D1
+    B3 -->|ghi diem danh| D1
+    B1 --> D1
