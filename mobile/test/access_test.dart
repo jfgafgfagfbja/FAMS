@@ -1,6 +1,7 @@
 import 'package:fams_app/core/roles.dart';
 import 'package:fams_app/router.dart';
 import 'package:fams_app/widgets/app_shell.dart';
+import 'package:fams_app/widgets/notification_bell.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const allRoles = [
@@ -46,6 +47,15 @@ void main() {
     expect(canAccess(Roles.student, '/self-checkin/5'), isTrue);
     expect(canAccess(Roles.parent, '/children/2'), isTrue);
     expect(canAccess(Roles.lecturer, '/self-checkin/5'), isFalse);
+  });
+
+  test('notification bell leads each role to a page it may open', () {
+    for (final role in allRoles) {
+      final target = alertTargetFor(role);
+      expect(target, isNotNull, reason: role);
+      expect(canAccess(role, target!), isTrue, reason: '$role -> $target');
+    }
+    expect(alertTargetFor('unknown'), isNull);
   });
 
   test('only admin manages units and staff accounts', () {

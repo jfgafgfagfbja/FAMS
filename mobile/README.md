@@ -12,11 +12,11 @@ lib/
 ├── main.dart, app.dart, router.dart   # khởi động, theme, điều hướng + chặn route theo vai trò
 ├── core/        # api_client (Dio, tự refresh token), auth_controller, roles (ma trận quyền), formatters, theme
 ├── models/      # model ánh xạ 1-1 schema backend (backend/app/schemas.py)
-├── widgets/     # app_shell (menu theo vai trò), paged_list, form_dialog, camera_capture, attendance_views…
+├── widgets/     # app_shell (menu theo vai trò), notification_bell (chuông cảnh báo), paged_list, form_dialog, camera_capture…
 └── features/
     ├── auth/      # đăng nhập, quên/đặt lại mật khẩu (OTP), tài khoản
     ├── home/      # trang chủ theo vai trò
-    ├── schedule/  # lịch tuần (SV tự điểm danh, GV mở phiên)
+    ├── schedule/  # lịch tuần (SV tự điểm danh, GV mở phiên, in thời khóa biểu PDF)
     ├── student/   # chuyên cần, tự điểm danh, đăng ký khuôn mặt, dữ liệu của tôi
     ├── parent/    # con em, chuyên cần của con
     ├── lecturer/  # phiên điểm danh, quét camera cả lớp, kết quả phiên, báo cáo + Excel
@@ -56,6 +56,8 @@ flutter build apk --release
 ```
 
 ## Lưu ý
+
+- Font PDF: `assets/fonts/Roboto-*.ttf` (Apache 2.0, giấy phép kèm theo) — cần font có dấu tiếng Việt, font mặc định của gói `pdf` không có.
 
 - Trình duyệt chỉ cho dùng camera trên **HTTPS hoặc localhost**. Triển khai web thật cần reverse proxy HTTPS.
 - Ảnh bằng chứng là URL có chữ ký, hết hạn sau `MEDIA_URL_EXPIRE_MINUTES` — kéo để tải lại trang nếu ảnh không hiện.

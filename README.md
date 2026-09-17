@@ -15,7 +15,6 @@ Hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện
   - Ảnh bằng chứng trả về dạng **URL có chữ ký HMAC** hết hạn (`MEDIA_URL_EXPIRE_MINUTES`), không còn thư mục `/evidence` công khai.
   - Thời gian trả về kèm múi giờ (`+07:00`). Nhật ký sửa điểm danh bắt buộc lý do (`attendance_audits`). Cảnh báo vắng (`ABSENCE_WARN_RATIO`), xuất Excel, thống kê tổng hợp theo Khoa (`GET /reports/overview`).
 - **App (Flutter — `mobile/`)**: một mã nguồn cho **Web, Android, iOS** (Dio + tự refresh token, go_router chặn route theo vai trò, camera, geolocator, fl_chart). Chi tiết: [mobile/README.md](mobile/README.md).
-- **Web React cũ (`frontend/`)**: giữ tạm để đối chiếu, không còn được build trong Docker Compose.
 - **Triển khai**: `docker-compose.yml` dựng `db` (Postgres 16 + pgvector), `backend` (`alembic upgrade head` rồi `uvicorn`), `frontend` (build Flutter web, nginx proxy `/api/` sang backend).
 
 ```
@@ -32,8 +31,7 @@ FAMS/
 │       ├── core/          # config, security (JWT/refresh), authz (ma trận quyền), media (URL ký), timeutil
 │       ├── services/      # face_service, session_service (đóng/tự đóng phiên), attendance_stats…
 │       └── schemas.py
-├── mobile/                # App Flutter (Web/Android/iOS)
-└── frontend/              # Web React cũ (sẽ gỡ)
+└── mobile/                # App Flutter (Web/Android/iOS) — giao diện duy nhất
 ```
 
 ## Phân quyền

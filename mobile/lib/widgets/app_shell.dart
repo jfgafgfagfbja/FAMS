@@ -6,6 +6,7 @@ import '../core/auth_controller.dart';
 import '../core/roles.dart';
 import '../core/theme.dart';
 import 'common.dart';
+import 'notification_bell.dart';
 
 class NavItem {
   const NavItem(this.path, this.label, this.icon);
@@ -161,6 +162,8 @@ class AppShell extends StatelessWidget {
         ],
       ),
       actions: [
+        NotificationBell(role: auth.role),
+        const SizedBox(width: 4),
         _AccountMenu(auth: auth),
         const SizedBox(width: 8),
       ],

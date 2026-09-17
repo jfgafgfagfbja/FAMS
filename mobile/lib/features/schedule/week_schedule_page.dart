@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
@@ -8,6 +10,7 @@ import '../../core/formatters.dart';
 import '../../core/roles.dart';
 import '../../models/models.dart';
 import '../../widgets/common.dart';
+import 'schedule_pdf.dart';
 
 /// Lich hoc/day theo tuan: SV tu diem danh, GV mo phien/vao phien, phong ban xem ket qua.
 class WeekSchedulePage extends StatefulWidget {
@@ -41,6 +44,28 @@ class _WeekSchedulePageState extends State<WeekSchedulePage> {
     }
   }
 
+  /// Xuat thoi khoa bieu tuan ra PDF: web mo hop thoai in cua trinh duyet, Android/iOS mo
+  /// man in/chia se cua he dieu hanh.
+  Future<void> _print(List<WeekSlot> slots) async {
+    final me = context.read<AuthController>().me!;
+    final owner = switch (me.role) {
+      Roles.student => 'Sinh viên: ${me.fullName}${me.studentCode != null ? ' (${me.studentCode})' : ''}',
+      Roles.lecturer => 'Giảng viên: ${me.fullName}${me.lecturerCode != null ? ' (${me.lecturerCode})' : ''}',
+      _ => '${Roles.label(me.role)}${me.unitName != null ? ' — ${me.unitName}' : ''}: ${me.fullName}',
+    };
+    try {
+      final fonts = await PdfFonts.load();
+      await Printing.layoutPdf(
+        name: 'lich-tuan-${isoDate(_monday)}.pdf',
+        onLayout: (format) async => Uint8List.fromList(
+          await buildWeekSchedulePdf(slots: slots, monday: _monday, owner: owner, fonts: fonts, format: format),
+        ),
+      );
+    } catch (e) {
+      if (mounted) showSnack(context, 'Không in được lịch: $e', error: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = context.watch<AuthController>().role;
@@ -69,6 +94,11 @@ class _WeekSchedulePageState extends State<WeekSchedulePage> {
                   tooltip: 'Tuần sau',
                   onPressed: () => setState(() => _monday = _monday.add(const Duration(days: 7))),
                   icon: const Icon(Icons.chevron_right),
+                ),
+                OutlinedButton.icon(
+                  onPressed: slots.isEmpty ? null : () => _print(slots),
+                  icon: const Icon(Icons.print_outlined),
+                  label: const Text('In lịch'),
                 ),
               ],
             ),
