@@ -6,18 +6,29 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
-from app.api.auth import limiter
+from passlib.context import CryptContext
+
+from app.api.auth import limiter, reset_login_failures
+from app.core import security
 from app.core.security import hash_password
 from app.db import models
 from app.db.database import Base, get_db
 from app.core.config import settings
 from app.main import app
 
+# Test khong chay vong lap nen (don anh, tu dong dong phien) - chung dung SessionLocal
+# tro vao DB dev that, khong phai DB test.
+settings.BACKGROUND_JOBS_ENABLED = False
+# bcrypt mac dinh 12 vong (~0.25s/lan) - moi test tao 5 tai khoan + dang nhap nen cham;
+# 4 vong la muc toi thieu cua bcrypt, chi ap dung trong test.
+security.pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__rounds=4)
+
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Login limiter dung storage chung theo process; reset truoc moi test de tranh anh huong cheo."""
     limiter.reset()
+    reset_login_failures()
     yield
 
 TEST_DB_NAME = "fams_test"

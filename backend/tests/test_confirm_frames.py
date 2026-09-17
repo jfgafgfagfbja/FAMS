@@ -76,12 +76,18 @@ def test_confirm_counts_are_isolated_per_session(client, seed, db_session, monke
     monkeypatch.setattr(face_service, "recognize_frame", _fake_recognize(seed["sv1_id"]))
     _send_frame(client, session_id_1, token)  # count=1 cho session_id_1
 
-    # dong phien 1 roi tao phien 2 truc tiep qua ORM (open_session gio chi cho mo
-    # phien cua ngay hom nay + chan trung (schedule_id, session_date), nen phien
-    # "ngay khac" phai dung du lieu dung san thay vi goi API)
+    # dong phien 1 roi tao phien 2 truc tiep qua ORM cho 1 lich hoc khac cua cung lop
+    # (UNIQUE(schedule_id, session_date) chan phien thu 2 cung lich trong ngay; phien
+    # phai la hom nay vi phien qua han nhan diem danh bi tu choi).
     client.patch(f"/sessions/{session_id_1}/close", headers=auth_headers(token))
+    schedule1 = db_session.get(models.Schedule, seed["schedule1_id"])
+    schedule3 = models.Schedule(class_id=seed["class1_id"], weekday=schedule1.weekday,
+                                start_time=schedule1.start_time, end_time=schedule1.end_time,
+                                room="P103")
+    db_session.add(schedule3)
+    db_session.flush()
     session2 = models.AttendanceSession(
-        schedule_id=seed["schedule1_id"], session_date=date(2020, 1, 1), status="open")
+        schedule_id=schedule3.id, session_date=date.today(), status="open")
     db_session.add(session2)
     db_session.commit()
     session_id_2 = session2.id

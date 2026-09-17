@@ -1,34 +1,55 @@
 import asyncio
-import os
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import IntegrityError
 
-from app.api import auth, classes, faces, lecturers, parents, reports, schedules, sessions, students
+from app.api import (auth, classes, faces, lecturers, media, parents, reports, schedules,
+                     sessions, staff, students, units)
 from app.api.auth import limiter
 from app.core.config import settings
 from app.db.database import init_db
 from app.services import antispoof_service
 from app.services.evidence_cleanup import run_cleanup_loop
+from app.services.session_service import run_auto_close_loop
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     antispoof_service.warm_up()  # log canh bao ngay neu chua co model, thay vi doi request dau
-    cleanup_task = asyncio.create_task(run_cleanup_loop())
+    tasks = []
+    if settings.BACKGROUND_JOBS_ENABLED:
+        tasks = [asyncio.create_task(run_cleanup_loop()),
+                 asyncio.create_task(run_auto_close_loop())]
     yield
-    cleanup_task.cancel()
+    for task in tasks:
+        task.cancel()
 
 
 app = FastAPI(title="FAMS — Face Attendance Management System", lifespan=lifespan)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError):
+    """Luoi an toan: vi pham rang buoc DB chua duoc kiem tra truoc o endpoint (trung
+    khoa, khoa ngoai dang duoc tham chieu...) tra 409 thay vi 500."""
+    logger.warning("IntegrityError tai %s %s: %s", request.method, request.url.path, exc.orig)
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "Du lieu bi trung hoac dang duoc su dung o noi khac"},
+    )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,18 +58,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     # X-Total-Count: tong so ban ghi cho phan trang (GET /students, /classes,
-    # /lecturers, /schedules) - trinh duyet an het header tuy chinh tru khi khai
-    # bao o day, du server da tra ve.
-    expose_headers=["X-Total-Count"],
+    # /lecturers, /schedules...) - trinh duyet an het header tuy chinh tru khi khai
+    # bao o day, du server da tra ve. Content-Disposition: ten file Excel khi tai ve.
+    expose_headers=["X-Total-Count", "Content-Disposition"],
 )
 
 for router in (auth.router, students.router, classes.router, lecturers.router,
                faces.router, sessions.router, reports.router, schedules.router,
-               parents.router):
+               parents.router, units.router, staff.router, media.router):
     app.include_router(router)
-
-os.makedirs(settings.EVIDENCE_DIR, exist_ok=True)
-app.mount("/evidence", StaticFiles(directory=settings.EVIDENCE_DIR), name="evidence")
 
 
 @app.get("/")

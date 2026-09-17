@@ -1,6 +1,10 @@
-from datetime import date, datetime, time
+from datetime import date, time
 
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, model_validator
+
+from app.core.media import SignedMediaUrl
+from app.core.timeutil import LocalDateTime
+from app.db.models import ROLE_BY_UNIT_TYPE
 
 
 # ---- Auth ----
@@ -8,6 +12,17 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
+    # App mobile luu refresh_token de lay access token moi qua POST /auth/refresh.
+    refresh_token: str | None = None
+    expires_in: int | None = None  # so giay access token con hieu luc
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -31,6 +46,69 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+# ---- Don vi (Khoa/Phong/Ban) ----
+class UnitCreate(BaseModel):
+    code: str
+    name: str
+    type: str  # faculty | training | student_affairs | board
+
+    @field_validator("type")
+    @classmethod
+    def _valid_type(cls, v: str) -> str:
+        if v not in ROLE_BY_UNIT_TYPE:
+            raise ValueError("Loai don vi phai la faculty, training, student_affairs hoac board")
+        return v
+
+
+class UnitUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+
+
+class UnitOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    type: str
+
+
+# ---- Can bo phong ban ----
+class StaffCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    unit_id: int
+    position: str = ""
+
+    @field_validator("password")
+    @classmethod
+    def _min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mat khau phai co it nhat 8 ky tu")
+        return v
+
+
+class StaffUpdate(BaseModel):
+    full_name: str | None = None
+    unit_id: int | None = None
+    position: str | None = None
+
+
+class StaffOut(BaseModel):
+    id: int
+    user_id: int
+    email: str
+    full_name: str
+    role: str
+    unit_id: int
+    unit_code: str
+    unit_name: str
+    unit_type: str
+    position: str
+
+
 # ---- Student ----
 class StudentCreate(BaseModel):
     email: EmailStr
@@ -39,12 +117,14 @@ class StudentCreate(BaseModel):
     student_code: str
     major: str = ""
     cohort: int = 0
+    faculty_id: int | None = None
 
 
 class StudentUpdate(BaseModel):
     full_name: str | None = None
     major: str | None = None
     cohort: int | None = None
+    faculty_id: int | None = None
 
 
 class StudentOut(BaseModel):
@@ -53,11 +133,13 @@ class StudentOut(BaseModel):
     full_name: str
     major: str
     cohort: int
+    # True khi co it nhat 1 anh khuon mat DA DUOC DUYET (dung duoc de nhan dien).
     face_enrolled: bool = False
+    face_status: str = "none"  # none | pending | approved | rejected
     consent_given: bool = False
-
-    class Config:
-        from_attributes = True
+    faculty_id: int | None = None
+    faculty_name: str | None = None
+    email: str | None = None
 
 
 # ---- Class ----
@@ -66,6 +148,7 @@ class ClassCreate(BaseModel):
     subject_name: str
     lecturer_id: int
     semester: str
+    faculty_id: int | None = None
 
 
 class ClassUpdate(BaseModel):
@@ -73,17 +156,27 @@ class ClassUpdate(BaseModel):
     subject_name: str | None = None
     lecturer_id: int | None = None
     semester: str | None = None
+    faculty_id: int | None = None
 
 
 class ClassOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     class_code: str
     subject_name: str
     lecturer_id: int
     semester: str
+    faculty_id: int | None = None
+    lecturer_name: str | None = None
+    faculty_name: str | None = None
+    student_count: int | None = None
 
-    class Config:
-        from_attributes = True
+
+def _check_weekday(v: int | None) -> int | None:
+    if v is not None and not 0 <= v <= 6:
+        raise ValueError("Thu trong tuan phai tu 0 (Thu 2) den 6 (Chu nhat)")
+    return v
 
 
 class ScheduleCreate(BaseModel):
@@ -93,6 +186,17 @@ class ScheduleCreate(BaseModel):
     end_time: time
     room: str
 
+    @field_validator("weekday")
+    @classmethod
+    def _valid_weekday(cls, v: int | None) -> int | None:
+        return _check_weekday(v)
+
+    @model_validator(mode="after")
+    def _start_before_end(self):
+        if self.start_time >= self.end_time:
+            raise ValueError("Gio bat dau phai truoc gio ket thuc")
+        return self
+
 
 class ScheduleUpdate(BaseModel):
     weekday: int | None = None
@@ -100,17 +204,21 @@ class ScheduleUpdate(BaseModel):
     end_time: time | None = None
     room: str | None = None
 
+    @field_validator("weekday")
+    @classmethod
+    def _valid_weekday(cls, v: int | None) -> int | None:
+        return _check_weekday(v)
+
 
 class ScheduleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     class_id: int
     weekday: int
     start_time: time
     end_time: time
     room: str
-
-    class Config:
-        from_attributes = True
 
 
 # ---- Lecturer ----
@@ -120,11 +228,13 @@ class LecturerCreate(BaseModel):
     full_name: str
     lecturer_code: str
     department: str = ""
+    faculty_id: int | None = None
 
 
 class LecturerUpdate(BaseModel):
     full_name: str | None = None
     department: str | None = None
+    faculty_id: int | None = None
 
 
 class LecturerOut(BaseModel):
@@ -132,9 +242,9 @@ class LecturerOut(BaseModel):
     lecturer_code: str
     full_name: str
     department: str
-
-    class Config:
-        from_attributes = True
+    email: str | None = None
+    faculty_id: int | None = None
+    faculty_name: str | None = None
 
 
 # ---- Attendance ----
@@ -144,13 +254,12 @@ class SessionCreate(BaseModel):
 
 
 class SessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     schedule_id: int
     session_date: date
     status: str
-
-    class Config:
-        from_attributes = True
 
 
 class SessionDetail(BaseModel):
@@ -160,13 +269,17 @@ class SessionDetail(BaseModel):
     schedule_id: int
     session_date: date
     status: str
-    opened_at: datetime
+    opened_at: LocalDateTime
+    closed_at: LocalDateTime | None = None
     class_id: int
     class_code: str
     subject_name: str
     room: str
     start_time: time
     end_time: time
+    lecturer_name: str | None = None
+    # Het thoi diem nay (end_time + SESSION_GRACE_MINUTES) khong nhan diem danh nua.
+    checkin_deadline: LocalDateTime | None = None
 
 
 class RecognizeResult(BaseModel):
@@ -176,7 +289,7 @@ class RecognizeResult(BaseModel):
     full_name: str | None
     confidence: float
     status: str  # recognized | unknown | already_checked | spoof | confirming
-    evidence_image: str | None = None  # URL /evidence/... lam bang chung
+    evidence_image: SignedMediaUrl = None  # URL /evidence/... (co chu ky) lam bang chung
     liveness_score: float | None = None  # diem "mat that" tu anti-spoofing
     bbox: list[int] | None = None  # [x1, y1, x2, y2] de frontend ve overlay
     confirm_count: int | None = None  # so frame da nhan dien trong phien (status=confirming)
@@ -189,26 +302,25 @@ class SelfCheckinResult(BaseModel):
     status: str  # recognized | already_checked | not_matched | no_face | multiple_faces | spoof
     confidence: float = 0.0
     liveness_score: float | None = None
-    evidence_image: str | None = None
+    evidence_image: SignedMediaUrl = None
     record_id: int | None = None
     record_status: str | None = None  # present | late (khi status=recognized/already_checked)
     message: str = ""
 
 
 class RecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     student_id: int
-    checked_at: datetime
+    checked_at: LocalDateTime
     status: str
     confidence: float
-    evidence_image: str = ""
+    evidence_image: SignedMediaUrl = ""
     source: str = "camera"
     latitude: float | None = None
     longitude: float | None = None
     location_accuracy: float | None = None
-
-    class Config:
-        from_attributes = True
 
 
 class RecordUpdate(BaseModel):
@@ -218,16 +330,15 @@ class RecordUpdate(BaseModel):
 
 
 class AttendanceAuditOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     record_id: int
     changed_by: int
     old_status: str
     new_status: str
     reason: str
-    changed_at: datetime
-
-    class Config:
-        from_attributes = True
+    changed_at: LocalDateTime
 
 
 class ManualCheck(BaseModel):
@@ -242,8 +353,8 @@ class RosterEntryOut(BaseModel):
     full_name: str
     status: str | None = None  # None = chua diem danh
     confidence: float | None = None
-    evidence_image: str | None = None
-    checked_at: datetime | None = None
+    evidence_image: SignedMediaUrl = None
+    checked_at: LocalDateTime | None = None
     record_id: int | None = None
     source: str | None = None  # camera | selfie | manual
     latitude: float | None = None
@@ -264,6 +375,9 @@ class TodayScheduleOut(BaseModel):
     # Gio som nhat duoc mo phien (= start_time - EARLY_OPEN_MINUTES), tinh san o
     # backend de FE khong phai hardcode nguong cau hinh.
     open_from: time
+    # Phien da mo hom nay cho lich nay (neu co) - FE vao thang phien thay vi mo lai.
+    session_id: int | None = None
+    session_status: str | None = None
 
 
 class MyAttendanceSessionOut(BaseModel):
@@ -271,9 +385,9 @@ class MyAttendanceSessionOut(BaseModel):
     session_id: int
     session_date: date
     status: str | None = None  # None = SV chua co record cho buoi nay
-    checked_at: datetime | None = None
+    checked_at: LocalDateTime | None = None
     confidence: float | None = None
-    evidence_image: str | None = None
+    evidence_image: SignedMediaUrl = None
     record_id: int | None = None
     source: str | None = None  # camera | selfie | manual
     latitude: float | None = None
@@ -282,7 +396,7 @@ class MyAttendanceSessionOut(BaseModel):
 
 
 class MyClassAttendanceOut(BaseModel):
-    """Chuyen can 1 lop hoc phan trong 1 hoc ky cua chinh SV dang dang nhap."""
+    """Chuyen can 1 lop hoc phan trong 1 hoc ky cua 1 SV."""
     class_id: int
     class_code: str
     subject_name: str
@@ -302,8 +416,7 @@ class MyClassAttendanceOut(BaseModel):
 
 
 class ScheduleWithClassOut(BaseModel):
-    """1 lich hoc kem thong tin lop - dung cho trang quan tri /admin/schedules
-    (xem toan bo lich hoc cua truong, khong chi 1 lop)."""
+    """1 lich hoc kem thong tin lop - dung cho trang quan tri lich hoc toan truong."""
     id: int
     class_id: int
     class_code: str
@@ -316,7 +429,7 @@ class ScheduleWithClassOut(BaseModel):
 
 class WeekSlotOut(BaseModel):
     """1 o lich trong tuan (ngay cu the), gop san trang thai phien/diem danh cho
-    SV hoac GV dang dang nhap - dung cho trang /schedule, tranh FE goi N+1."""
+    SV hoac GV dang dang nhap - dung cho trang lich tuan, tranh FE goi N+1."""
     date: date
     weekday: int
     schedule_id: int
@@ -351,12 +464,23 @@ class MeOut(BaseModel):
     email: str
     full_name: str
     role: str
+    student_id: int | None = None
     student_code: str | None = None
     major: str | None = None
     cohort: int | None = None
     consent_given: bool | None = None
+    face_status: str | None = None
+    lecturer_id: int | None = None
     lecturer_code: str | None = None
     department: str | None = None
+    faculty_id: int | None = None
+    faculty_name: str | None = None
+    # Can bo phong ban
+    unit_id: int | None = None
+    unit_code: str | None = None
+    unit_name: str | None = None
+    unit_type: str | None = None
+    position: str | None = None
     classes: list[MeClassBrief] = []
 
 
@@ -368,20 +492,32 @@ class EnrollResult(BaseModel):
 
 
 class FacePendingOut(BaseModel):
-    """1 embedding cho duyet, kem canh bao trung (neu co) de admin thay khi duyet."""
+    """1 embedding cho duyet, kem anh doi chieu va canh bao trung (neu co)."""
     id: int
     student_id: int
     student_code: str
     full_name: str
-    source_image: str
-    created_at: datetime
+    source_image: SignedMediaUrl = ""
+    created_at: LocalDateTime
     duplicate_warning: bool = False
     duplicate_student_code: str | None = None
     duplicate_similarity: float | None = None
 
 
+class FaceMineOut(BaseModel):
+    """Du lieu khuon mat cua chinh SV dang dang nhap (khong tra embedding)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    status: str
+    reject_reason: str
+    created_at: LocalDateTime
+
+
 class FaceRejectBody(BaseModel):
     reason: str
+
+
 # ---- Parent ----
 class ParentCreate(BaseModel):
     email: EmailStr
@@ -396,14 +532,13 @@ class ParentUpdate(BaseModel):
 
 
 class ParentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     full_name: str
     email: str
     phone: str = ""
     child_count: int = 0
-
-    class Config:
-        from_attributes = True
 
 
 class ParentLinkChild(BaseModel):
@@ -414,3 +549,36 @@ class ParentChildOut(StudentOut):
     """StudentOut mo rong voi danh sach lop hoc phan - dung cho GET /parents/me/children
     de phu huynh co san danh sach hoc ky/lop ma khong phai goi them API khac."""
     classes: list[MeClassBrief] = []
+
+
+# ---- Thong ke tong hop ----
+class OverviewStats(BaseModel):
+    classes: int
+    students: int
+    lecturers: int
+    closed_sessions: int
+    records: int
+    present: int
+    late: int
+    manual: int
+    absent: int
+    excused: int
+    attendance_rate: float  # (present + late + manual) / records
+    absent_rate: float      # absent / records
+    warned_students: int    # so SV vuot nguong vang o it nhat 1 lop
+
+
+class OverviewFacultyRow(OverviewStats):
+    faculty_id: int | None
+    faculty_code: str | None
+    faculty_name: str
+
+
+class OverviewOut(BaseModel):
+    """Thong ke chuyen can tong hop - CHI so lieu, khong ten/anh (dung cho Ban nganh)."""
+    scope: str  # school | faculty
+    scope_name: str
+    semester: str | None
+    semesters: list[str]
+    totals: OverviewStats
+    by_faculty: list[OverviewFacultyRow]

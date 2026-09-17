@@ -5,7 +5,8 @@ Recognition: frame -> detect nhieu mat -> embedding -> so khop voi SV trong lop.
 
 Dung InsightFace buffalo_l (SCRFD detector + ArcFace). Chay CPU qua ONNX Runtime.
 """
-import io
+import os
+import uuid
 
 import cv2
 import numpy as np
@@ -98,12 +99,33 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
                 "Can admin xac minh."
             )
 
-    # Embedding moi luon o trang thai "pending" - chi admin duyet (PATCH
-    # /faces/{id}/approve) moi duoc dung de nhan dien (xem recognize_frame).
+    # Embedding moi luon o trang thai "pending" - chi admin/P.CTSV duyet (PATCH
+    # /faces/{id}/approve) moi duoc dung de nhan dien (xem recognize_frame). Anh mat
+    # da cat duoc luu TAM de nguoi duyet doi chieu, xoa khi duyet/tu choi.
     db.add(models.FaceEmbedding(student_id=student_id, embedding=emb.tolist(),
-                                status="pending"))
+                                status="pending",
+                                source_image=_save_review_crop(img, face.bbox, student_id)))
     db.commit()
-    return True, "Da luu anh, dang cho quan tri vien duyet"
+    return True, "Da luu anh, dang cho can bo duyet"
+
+
+def _save_review_crop(img: np.ndarray, bbox, student_id: int) -> str:
+    """Cat vung mat (noi rong 30% moi phia) luu vao EVIDENCE_DIR/faces/<student_id>/."""
+    h, w = img.shape[:2]
+    x1, y1, x2, y2 = bbox.astype(int)
+    pad_x, pad_y = int((x2 - x1) * 0.3), int((y2 - y1) * 0.3)
+    crop = img[max(y1 - pad_y, 0):min(y2 + pad_y, h), max(x1 - pad_x, 0):min(x2 + pad_x, w)]
+    if crop.size == 0:
+        crop = img
+    ok, buf = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    if not ok:
+        return ""
+    rel_dir = os.path.join("faces", str(student_id))
+    os.makedirs(os.path.join(settings.EVIDENCE_DIR, rel_dir), exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.jpg"
+    with open(os.path.join(settings.EVIDENCE_DIR, rel_dir, filename), "wb") as f:
+        f.write(buf.tobytes())
+    return f"/evidence/faces/{student_id}/{filename}"
 
 
 # ---------------- SELF CHECK-IN (SV tu chup selfie) ----------------

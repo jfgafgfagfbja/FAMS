@@ -7,64 +7,21 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.core.authz import ensure_class_access
+from app import schemas
+from app.core.authz import OVERVIEW_VIEWERS, ensure_class_view, staff_unit_id
 from app.core.config import settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, require_roles
 from app.db import models
 from app.db.database import get_db
+from app.db.models import ROLE_FACULTY
+from app.services.attendance_stats import STATUSES, compute_class_attendance_stats
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
+__all__ = ["router", "compute_class_attendance_stats"]
+
 STATUS_LETTER = {"present": "P", "late": "L", "absent": "A", "excused": "E", "manual": "M"}
 RED_FILL = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-
-
-def compute_class_attendance_stats(db: Session, class_id: int) -> list[dict]:
-    """Thong ke chuyen can tung SV trong lop: so buoi present/late/absent/excused/manual,
-    ti le vang (khong tinh excused) va co vuot ABSENCE_WARN_RATIO hay khong.
-
-    Dung chung cho GET /attendance/{class_id}, /attendance/warnings va export Excel.
-    """
-    total_sessions = (
-        db.query(func.count(models.AttendanceSession.id))
-        .join(models.Schedule)
-        .filter(models.Schedule.class_id == class_id,
-                models.AttendanceSession.status == "closed")
-        .scalar()
-    ) or 0
-
-    rows = (
-        db.query(models.AttendanceRecord.student_id,
-                 models.AttendanceRecord.status,
-                 func.count().label("cnt"))
-        .join(models.AttendanceSession)
-        .join(models.Schedule)
-        .filter(models.Schedule.class_id == class_id)
-        .group_by(models.AttendanceRecord.student_id,
-                  models.AttendanceRecord.status)
-        .all()
-    )
-
-    stats: dict[int, dict] = {}
-    for student_id, status, cnt in rows:
-        stats.setdefault(student_id, {"present": 0, "late": 0,
-                                      "absent": 0, "excused": 0, "manual": 0})
-        stats[student_id][status] = cnt
-
-    result = []
-    for student_id, s in stats.items():
-        student = db.get(models.Student, student_id)
-        # excused khong tinh la vang khi xet canh bao chuyen can
-        absent_ratio = s["absent"] / total_sessions if total_sessions else 0
-        result.append({
-            "student_id": student_id,
-            "student_code": student.student_code,
-            "full_name": student.user.full_name,
-            **s,
-            "total_sessions": total_sessions,
-            "warning": absent_ratio >= settings.ABSENCE_WARN_RATIO,
-        })
-    return result
 
 
 @router.get("/attendance/warnings")
@@ -75,7 +32,7 @@ def attendance_warnings(
 ):
     """Danh sach SV vuot nguong vang (absent / tong buoi da hoc >= ABSENCE_WARN_RATIO).
     excused khong tinh la vang."""
-    ensure_class_access(user, class_id, db)
+    ensure_class_view(user, class_id, db)
     return [r for r in compute_class_attendance_stats(db, class_id) if r["warning"]]
 
 
@@ -87,12 +44,8 @@ def export_attendance(
     user: models.User = Depends(get_current_user),
 ):
     """Xuat file Excel diem danh: sheet 1 la ma tran SV x buoi hoc, sheet 2 la
-    thong ke tong hop lop. Chi lecturer cua lop hoac admin."""
-    ensure_class_access(user, class_id, db)
-
-    clazz = db.get(models.Class, class_id)
-    if not clazz:
-        raise HTTPException(404, "Lop hoc phan khong ton tai")
+    thong ke tong hop lop. Nguoi duoc xem lop (GV lop, admin, phong ban, Khoa)."""
+    clazz = ensure_class_view(user, class_id, db)
     if clazz.semester != semester:
         raise HTTPException(
             400, f"Lop {clazz.class_code} thuoc hoc ky {clazz.semester}, khong phai {semester}")
@@ -164,6 +117,7 @@ def export_attendance(
         ("Ma lop", clazz.class_code),
         ("Mon hoc", clazz.subject_name),
         ("Hoc ky", clazz.semester),
+        ("Khoa", clazz.faculty.name if clazz.faculty else ""),
         ("Tong so sinh vien", len(students)),
         ("Tong so buoi da diem danh", total_sessions),
         ("So SV vuot nguong canh bao vang", warning_count),
@@ -189,6 +143,105 @@ def export_attendance(
     )
 
 
+def _aggregate(db: Session, classes: list[models.Class]) -> dict:
+    """So lieu chuyen can gop cho 1 nhom lop (khong kem ten/anh)."""
+    class_ids = [c.id for c in classes]
+    empty = {"classes": 0, "students": 0, "lecturers": 0, "closed_sessions": 0, "records": 0,
+             **{s: 0 for s in STATUSES}, "attendance_rate": 0.0, "absent_rate": 0.0,
+             "warned_students": 0}
+    if not class_ids:
+        return empty
+
+    closed_sessions = (
+        db.query(func.count(models.AttendanceSession.id))
+        .join(models.Schedule)
+        .filter(models.Schedule.class_id.in_(class_ids),
+                models.AttendanceSession.status == "closed")
+        .scalar()
+    ) or 0
+    status_rows = (
+        db.query(models.AttendanceRecord.status, func.count())
+        .join(models.AttendanceSession)
+        .join(models.Schedule)
+        .filter(models.Schedule.class_id.in_(class_ids),
+                models.AttendanceSession.status == "closed")
+        .group_by(models.AttendanceRecord.status)
+        .all()
+    )
+    counts = {s: 0 for s in STATUSES}
+    for status, cnt in status_rows:
+        counts[status] = cnt
+    records = sum(counts.values())
+
+    students = (
+        db.query(func.count(func.distinct(models.Enrollment.student_id)))
+        .filter(models.Enrollment.class_id.in_(class_ids))
+        .scalar()
+    ) or 0
+    warned = {
+        r["student_id"]
+        for c in classes
+        for r in compute_class_attendance_stats(db, c.id)
+        if r["warning"]
+    }
+    attended = counts["present"] + counts["late"] + counts["manual"]
+    return {
+        "classes": len(classes), "students": students,
+        "lecturers": len({c.lecturer_id for c in classes}),
+        "closed_sessions": closed_sessions, "records": records, **counts,
+        "attendance_rate": round(attended / records, 4) if records else 0.0,
+        "absent_rate": round(counts["absent"] / records, 4) if records else 0.0,
+        "warned_students": len(warned),
+    }
+
+
+@router.get("/overview", response_model=schemas.OverviewOut)
+def attendance_overview(
+    semester: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*OVERVIEW_VIEWERS)),
+):
+    """Thong ke chuyen can tong hop theo hoc ky, chia theo Khoa. Chi so lieu (khong ten,
+    khong anh) nen Ban nganh cung xem duoc; can bo Khoa chi thay Khoa cua minh.
+    Khong truyen semester -> hoc ky moi nhat co lop hoc phan."""
+    class_query = db.query(models.Class)
+    if user.role == ROLE_FACULTY:
+        unit_id = staff_unit_id(user, db)
+        unit = db.get(models.Unit, unit_id) if unit_id else None
+        class_query = class_query.filter(models.Class.faculty_id == (unit_id or -1))
+        scope, scope_name = "faculty", unit.name if unit else "Chua gan don vi"
+    else:
+        scope, scope_name = "school", "Toan truong"
+
+    semesters = sorted(
+        {sem for (sem,) in class_query.with_entities(models.Class.semester).distinct()},
+        reverse=True,
+    )
+    target = semester or (semesters[0] if semesters else None)
+    classes = class_query.filter(models.Class.semester == target).all() if target else []
+
+    by_faculty: dict[int | None, list[models.Class]] = {}
+    for c in classes:
+        by_faculty.setdefault(c.faculty_id, []).append(c)
+
+    faculty_rows = []
+    for faculty_id, group in by_faculty.items():
+        unit = db.get(models.Unit, faculty_id) if faculty_id else None
+        faculty_rows.append(schemas.OverviewFacultyRow(
+            faculty_id=faculty_id,
+            faculty_code=unit.code if unit else None,
+            faculty_name=unit.name if unit else "Chua gan Khoa",
+            **_aggregate(db, group),
+        ))
+    faculty_rows.sort(key=lambda r: (r.faculty_id is None, r.faculty_name))
+
+    return schemas.OverviewOut(
+        scope=scope, scope_name=scope_name, semester=target, semesters=semesters,
+        totals=schemas.OverviewStats(**_aggregate(db, classes)),
+        by_faculty=faculty_rows,
+    )
+
+
 @router.get("/attendance/{class_id}")
 def class_attendance(
     class_id: int,
@@ -196,7 +249,7 @@ def class_attendance(
     user: models.User = Depends(get_current_user),
 ):
     """Thong ke chuyen can theo lop: ti le vang tung SV + canh bao."""
-    ensure_class_access(user, class_id, db)
+    ensure_class_view(user, class_id, db)
     return compute_class_attendance_stats(db, class_id)
 
 
@@ -205,7 +258,7 @@ def my_attendance(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """Sinh vien tu xem lich su diem danh cua chinh minh, theo tung lop da dang ky."""
+    """Sinh vien tu xem tom tat chuyen can theo tung lop da dang ky (chi tinh phien da dong)."""
     if user.role != "student":
         raise HTTPException(403, "Chi sinh vien moi xem duoc muc nay")
     student = db.query(models.Student).filter_by(user_id=user.id).first()
@@ -223,12 +276,13 @@ def my_attendance(
             .scalar()
         ) or 0
 
-        counts = {"present": 0, "late": 0, "absent": 0, "excused": 0, "manual": 0}
+        counts = {s: 0 for s in STATUSES}
         rows = (
             db.query(models.AttendanceRecord.status, func.count().label("cnt"))
             .join(models.AttendanceSession)
             .join(models.Schedule)
             .filter(models.Schedule.class_id == clazz.id,
+                    models.AttendanceSession.status == "closed",
                     models.AttendanceRecord.student_id == student.id)
             .group_by(models.AttendanceRecord.status)
             .all()
@@ -239,8 +293,10 @@ def my_attendance(
         # excused khong tinh la vang khi xet canh bao chuyen can
         absent_ratio = counts["absent"] / total_sessions if total_sessions else 0
         result.append({
+            "class_id": clazz.id,
             "class_code": clazz.class_code,
             "subject_name": clazz.subject_name,
+            "semester": clazz.semester,
             **counts,
             "total_sessions": total_sessions,
             "warning": absent_ratio >= settings.ABSENCE_WARN_RATIO,

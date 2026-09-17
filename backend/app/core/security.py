@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 import uuid
 from datetime import datetime, timedelta
 
@@ -23,10 +25,11 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
-def create_access_token(user_id: int, role: str) -> str:
+def create_access_token(user_id: int, role: str, token_version: int = 0) -> str:
     now = datetime.utcnow()
     expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "role": role, "exp": expire, "iat": now, "jti": uuid.uuid4().hex}
+    payload = {"sub": str(user_id), "role": role, "exp": expire, "iat": now,
+               "jti": uuid.uuid4().hex, "tv": token_version}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -57,19 +60,14 @@ def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User khong ton tai")
 
     # Token phat truoc lan doi mat khau gan nhat (vd qua quen mat khau) bi coi la
-    # da thu hoi - khong the liet ke tung jti da phat truoc do nen dung moc thoi
-    # gian de thu hoi hang loat. Token cu (phat truoc khi co tinh nang nay) khong
-    # co "iat" nen bo qua kiem tra, khong lam gian doan phien dang dang nhap.
-    iat = payload.get("iat")
-    if user.credentials_changed_at and iat is not None:
-        issued_at = datetime.utcfromtimestamp(iat)
-        # So sanh o do phan giai GIAY: "iat" trong JWT bi lam tron xuong giay chan,
-        # con credentials_changed_at co microsecond - neu giu nguyen thi token phat
-        # ra NGAY SAU khi doi mat khau (cung giay) cung bi coi la cu va tra 401 oan.
-        if issued_at < user.credentials_changed_at.replace(microsecond=0):
-            raise HTTPException(
-                status.HTTP_401_UNAUTHORIZED,
-                "Token da bi thu hoi do doi mat khau, vui long dang nhap lai")
+    # da thu hoi - khong the liet ke tung jti da phat truoc do nen so version: moi lan
+    # dat lai mat khau tang users.token_version. Truoc day so "iat" voi moc thoi gian
+    # nhung "iat" chi chinh xac toi giay, token phat CUNG GIAY voi luc doi mat khau van
+    # song sot. Token khong co "tv" (phat truoc khi co co che nay) coi nhu version 0.
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Token da bi thu hoi do doi mat khau, vui long dang nhap lai")
 
     request.state.token_payload = payload
     return user
@@ -83,6 +81,60 @@ def revoke_token(db: Session, payload: dict) -> None:
         return
     db.add(models.RevokedToken(jti=jti, expires_at=datetime.utcfromtimestamp(exp)))
     db.commit()
+
+
+# ---------------- Refresh token (app mobile) ----------------
+
+def _hash_refresh_token(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def create_refresh_token(db: Session, user_id: int) -> str:
+    raw = secrets.token_urlsafe(48)
+    db.add(models.RefreshToken(
+        user_id=user_id, token_hash=_hash_refresh_token(raw),
+        expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    ))
+    db.commit()
+    return raw
+
+
+def revoke_all_refresh_tokens(db: Session, user_id: int) -> None:
+    (
+        db.query(models.RefreshToken)
+        .filter(models.RefreshToken.user_id == user_id, models.RefreshToken.revoked_at.is_(None))
+        .update({"revoked_at": datetime.utcnow()})
+    )
+
+
+def revoke_refresh_token(db: Session, raw: str, user_id: int) -> None:
+    """Thu hoi 1 refresh token (logout) - chi token thuoc chinh user dang dang xuat."""
+    token = db.query(models.RefreshToken).filter_by(token_hash=_hash_refresh_token(raw)).first()
+    if token and token.user_id == user_id and token.revoked_at is None:
+        token.revoked_at = datetime.utcnow()
+        db.commit()
+
+
+def rotate_refresh_token(db: Session, raw: str) -> tuple[models.User, str]:
+    """Doi refresh token cu lay (user, refresh token moi). Token cu bi thu hoi."""
+    invalid = HTTPException(status.HTTP_401_UNAUTHORIZED, "Phien dang nhap het han, vui long dang nhap lai")
+    token = db.query(models.RefreshToken).filter_by(token_hash=_hash_refresh_token(raw)).first()
+    if not token:
+        raise invalid
+    if token.revoked_at is not None:
+        # Token da xoay vong/thu hoi ma van bi dung lai -> co the da bi lo: thu hoi het.
+        revoke_all_refresh_tokens(db, token.user_id)
+        db.commit()
+        raise invalid
+    if token.expires_at < datetime.utcnow():
+        raise invalid
+
+    user = db.get(models.User, token.user_id)
+    if not user:
+        raise invalid
+    token.revoked_at = datetime.utcnow()
+    db.commit()
+    return user, create_refresh_token(db, user.id)
 
 
 def require_roles(*roles: str):

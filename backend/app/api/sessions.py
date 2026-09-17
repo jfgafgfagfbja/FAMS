@@ -7,28 +7,28 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import schemas
-from app.api.reports import compute_class_attendance_stats
-from app.core.authz import ensure_class_access
+from app.core.authz import (CLASS_VIEWERS, can_excuse_record, ensure_class_access,
+                            ensure_class_view, filter_classes)
 from app.core.config import settings
 from app.core.security import require_roles
 from app.db import models
 from app.db.database import get_db
+from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT)
 from app.services import face_service
+from app.services.session_service import (_confirm_counts, checkin_deadline,
+                                          close_session as close_session_records,
+                                          ensure_accepting_checkins)
 
 router = APIRouter(prefix="/sessions", tags=["attendance"])
 
-# Dem so frame da nhan dien duoc 1 SV trong 1 phien, truoc khi ghi attendance record
-# (multi-frame confirmation - giam nhan nham). Luu in-memory theo session_id, KHONG
-# ben vung: mat het khi restart server (chap nhan duoc vi chi anh huong phien dang
-# mo tai thoi diem restart, SV se phai duoc nhan dien lai tu dau). Don khi dong phien.
-_confirm_counts: dict[int, dict[int, int]] = {}
+__all__ = ["router", "_confirm_counts"]
 
 
 def _save_evidence(image_bytes: bytes, session_id: int) -> str:
-    """Luu frame lam bang chung, tra ve duong dan tuong doi (de dung voi /evidence/...)."""
+    """Luu frame lam bang chung, tra ve duong dan tho (API ky URL khi tra ve client)."""
     dir_path = os.path.join(settings.EVIDENCE_DIR, str(session_id))
     os.makedirs(dir_path, exist_ok=True)
-    filename = f"{datetime.now():%Y%m%d%H%M%S}_{uuid.uuid4().hex[:6]}.jpg"
+    filename = f"{datetime.now():%Y%m%d%H%M%S}_{uuid.uuid4().hex[:12]}.jpg"
     with open(os.path.join(dir_path, filename), "wb") as f:
         f.write(image_bytes)
     return f"/evidence/{session_id}/{filename}"
@@ -41,11 +41,31 @@ def _get_session_or_404(db: Session, session_id: int) -> models.AttendanceSessio
     return session
 
 
+def _session_detail(session: models.AttendanceSession) -> schemas.SessionDetail:
+    clazz = session.schedule.clazz
+    return schemas.SessionDetail(
+        id=session.id, schedule_id=session.schedule_id,
+        session_date=session.session_date, status=session.status,
+        opened_at=session.opened_at, closed_at=session.closed_at,
+        class_id=clazz.id, class_code=clazz.class_code, subject_name=clazz.subject_name,
+        room=session.schedule.room, start_time=session.schedule.start_time,
+        end_time=session.schedule.end_time,
+        lecturer_name=clazz.lecturer.user.full_name if clazz.lecturer else None,
+        checkin_deadline=checkin_deadline(session),
+    )
+
+
+def _is_late(session: models.AttendanceSession) -> bool:
+    """Dung gio hay muon: so voi gio bat dau tiet + LATE_AFTER_MINUTES."""
+    start = datetime.combine(session.session_date, session.schedule.start_time)
+    return datetime.now() > start + timedelta(minutes=settings.LATE_AFTER_MINUTES)
+
+
 @router.post("", response_model=schemas.SessionOut)
 def open_session(
     body: schemas.SessionCreate,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN)),
 ):
     """Mo phien diem danh. Chi cho mo khi: dung ngay hom nay, dung thu cua lich hoc,
     trong khung [start_time - EARLY_OPEN_MINUTES, end_time] va chua co phien nao cua
@@ -94,62 +114,51 @@ def open_session(
 @router.get("", response_model=list[schemas.SessionDetail])
 def list_sessions(
     status: str | None = None,
+    class_id: int | None = None,
     mine: bool = False,
+    limit: int | None = None,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
 ):
-    """Danh sach phien diem danh, loc theo status (open/closed) va mine (giang vien
-    chi thay lop minh day). Dung cho widget/trang 'Phien diem danh'."""
-    query = db.query(models.AttendanceSession).join(models.Schedule).join(models.Class)
+    """Danh sach phien diem danh trong pham vi xem lop cua user (GV: lop minh day,
+    Khoa: lop Khoa quan ly), loc theo status (open/closed) va class_id. Tham so mine
+    giu de tuong thich - pham vi da duoc gioi han theo vai tro."""
+    query = filter_classes(
+        db.query(models.AttendanceSession).join(models.Schedule).join(models.Class), user, db)
     if status:
         query = query.filter(models.AttendanceSession.status == status)
-    if mine and user.role == "lecturer":
-        lecturer = db.query(models.Lecturer).filter_by(user_id=user.id).first()
-        query = query.filter(models.Class.lecturer_id == (lecturer.id if lecturer else -1))
+    if class_id is not None:
+        query = query.filter(models.Class.id == class_id)
 
-    sessions = query.order_by(models.AttendanceSession.session_date.desc()).all()
-    return [
-        schemas.SessionDetail(
-            id=s.id, schedule_id=s.schedule_id, session_date=s.session_date,
-            status=s.status, opened_at=s.opened_at, class_id=s.schedule.clazz.id,
-            class_code=s.schedule.clazz.class_code, subject_name=s.schedule.clazz.subject_name,
-            room=s.schedule.room, start_time=s.schedule.start_time, end_time=s.schedule.end_time,
-        )
-        for s in sessions
-    ]
+    query = query.order_by(models.AttendanceSession.session_date.desc(),
+                           models.AttendanceSession.opened_at.desc())
+    if limit is not None:
+        query = query.limit(limit)
+    return [_session_detail(s) for s in query.all()]
 
 
 @router.get("/{session_id}", response_model=schemas.SessionDetail)
 def get_session(
     session_id: int,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
 ):
     """Chi tiet 1 phien, kem thong tin lop/lich - frontend dung de lay class_id."""
     session = _get_session_or_404(db, session_id)
-    ensure_class_access(user, session.schedule.class_id, db)
-
-    clazz = session.schedule.clazz
-    return schemas.SessionDetail(
-        id=session.id, schedule_id=session.schedule_id,
-        session_date=session.session_date, status=session.status,
-        opened_at=session.opened_at,
-        class_id=clazz.id, class_code=clazz.class_code, subject_name=clazz.subject_name,
-        room=session.schedule.room, start_time=session.schedule.start_time,
-        end_time=session.schedule.end_time,
-    )
+    ensure_class_view(user, session.schedule.class_id, db)
+    return _session_detail(session)
 
 
 @router.get("/{session_id}/roster", response_model=list[schemas.RosterEntryOut])
 def session_roster(
     session_id: int,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
 ):
     """Danh sach SV cua lop gop voi trang thai diem danh cua phien nay trong 1 lan
     goi (thay vi FE phai goi rieng /classes/{id}/students + /sessions/{id}/records)."""
     session = _get_session_or_404(db, session_id)
-    ensure_class_access(user, session.schedule.class_id, db)
+    ensure_class_view(user, session.schedule.class_id, db)
     class_id = session.schedule.class_id
 
     students = (
@@ -188,13 +197,12 @@ async def recognize(
     session_id: int,
     frame: UploadFile = File(...),
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN)),
 ):
-    """Nhan 1 frame tu webcam, nhan dien va tu dong ghi diem danh."""
+    """Nhan 1 frame tu camera lop hoc, nhan dien va tu dong ghi diem danh."""
     session = _get_session_or_404(db, session_id)
-    if session.status != "open":
-        raise HTTPException(404, "Phien khong ton tai hoac da dong")
     ensure_class_access(user, session.schedule.class_id, db)
+    ensure_accepting_checkins(session)
 
     class_id = session.schedule.class_id
     data = await frame.read()
@@ -208,7 +216,7 @@ async def recognize(
         student = db.get(models.Student, m["student_id"]) if m["student_id"] else None
 
         if is_spoof:
-            # Nghi gia mao: van luu anh bang chung de admin xem lai ai gian lan,
+            # Nghi gia mao: van luu anh bang chung de can bo xem lai ai gian lan,
             # nhung khong ghi attendance record du co nhan ra danh tinh hay khong.
             if evidence_path is None:
                 evidence_path = _save_evidence(data, session_id)
@@ -255,21 +263,22 @@ async def recognize(
                     confirm_needed=confirm_needed))
                 continue
 
-            # Dung gio hay muon: so voi gio bat dau tiet + LATE_AFTER_MINUTES
-            start = datetime.combine(session.session_date,
-                                     session.schedule.start_time)
-            late = datetime.now() > start + timedelta(
-                minutes=settings.LATE_AFTER_MINUTES)
             if evidence_path is None:
                 evidence_path = _save_evidence(data, session_id)
             db.add(models.AttendanceRecord(
                 session_id=session_id, student_id=student.id,
-                status="late" if late else "present",
+                status="late" if _is_late(session) else "present",
                 confidence=m["confidence"], evidence_image=evidence_path,
                 source="camera"))
-            db.commit()
-            status = "recognized"
-            evidence = evidence_path
+            try:
+                db.commit()
+                status = "recognized"
+                evidence = evidence_path
+            except IntegrityError:
+                # Frame khac (vd 2 thiet bi cung quet) vua ghi record cho SV nay.
+                db.rollback()
+                status = "already_checked"
+                evidence = None
 
         results.append(schemas.RecognizeResult(
             student_id=student.id, student_code=student.student_code,
@@ -285,15 +294,23 @@ def manual_check(
     session_id: int,
     body: schemas.ManualCheck,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN)),
 ):
-    """Giang vien xac nhan tay khi SV khong nhan dien duoc."""
+    """Giang vien xac nhan tay khi SV khong nhan dien duoc (chi trong phien dang mo,
+    chi SV ghi danh lop). Sau khi dong phien, sua trang thai qua PATCH records."""
     session = _get_session_or_404(db, session_id)
     ensure_class_access(user, session.schedule.class_id, db)
+    if session.status != "open":
+        raise HTTPException(400, "Phien da dong, hay sua trang thai diem danh thay vi xac nhan tay")
 
-    # Chan trung truoc khi insert - UniqueConstraint(session_id, student_id) o DB
-    # se chan o tang du lieu, nhung khong bat truoc thi se lo ra IntegrityError 500
-    # thay vi 1 loi 400 de hieu.
+    enrolled = (
+        db.query(models.Enrollment)
+        .filter_by(class_id=session.schedule.class_id, student_id=body.student_id)
+        .first()
+    )
+    if not enrolled:
+        raise HTTPException(400, "Sinh vien khong thuoc lop hoc phan nay")
+
     existed = (
         db.query(models.AttendanceRecord)
         .filter_by(session_id=session_id, student_id=body.student_id)
@@ -306,7 +323,11 @@ def manual_check(
         session_id=session_id, student_id=body.student_id, status="manual",
         source="manual")
     db.add(record)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(400, "Sinh vien nay da co record trong phien nay")
     db.refresh(record)
     return record
 
@@ -319,15 +340,14 @@ async def self_checkin(
     longitude: float | None = Form(None),
     accuracy: float | None = Form(None),
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("student")),
+    user: models.User = Depends(require_roles(ROLE_STUDENT)),
 ):
     """SV tu chup selfie de diem danh (khac luong GV quet camera ca lop o
     /recognize): chi nhan dien so voi khuon mat cua CHINH SV dang dang nhap
-    (recognize_self), kem toa do GPS lay tu trinh duyet (neu SV cho phep) de
-    lam bang chung thoi gian + dia diem diem danh."""
+    (recognize_self), kem toa do GPS (neu SV cho phep) de lam bang chung thoi gian +
+    dia diem diem danh. Chi nhan truoc han checkin_deadline cua phien."""
     session = _get_session_or_404(db, session_id)
-    if session.status != "open":
-        raise HTTPException(404, "Phien khong ton tai hoac da dong")
+    ensure_accepting_checkins(session)
 
     student = db.query(models.Student).filter_by(user_id=user.id).first()
     if not student:
@@ -375,13 +395,10 @@ async def self_checkin(
             message="Khuon mat khong khop voi du lieu da dang ky cua ban. "
                     "Neu chua dang ky khuon mat, hay vao muc \"Dang ky khuon mat\" truoc.")
 
-    # matched: dung gio hay muon giong luong camera - so voi gio bat dau tiet + LATE_AFTER_MINUTES
-    start = datetime.combine(session.session_date, session.schedule.start_time)
-    late = datetime.now() > start + timedelta(minutes=settings.LATE_AFTER_MINUTES)
     evidence_path = _save_evidence(data, session_id)
     record = models.AttendanceRecord(
         session_id=session_id, student_id=student.id,
-        status="late" if late else "present",
+        status="late" if _is_late(session) else "present",
         confidence=result["confidence"], evidence_image=evidence_path,
         source="selfie", latitude=latitude, longitude=longitude, location_accuracy=accuracy,
     )
@@ -414,59 +431,31 @@ async def self_checkin(
 def close_session(
     session_id: int,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN)),
 ):
     """Dong phien: SV chua co record -> absent. Tra kem danh sach SV vua vuot
     nguong canh bao chuyen can do phien nay (so voi truoc khi dong)."""
     session = _get_session_or_404(db, session_id)
     ensure_class_access(user, session.schedule.class_id, db)
-    class_id = session.schedule.class_id
-
-    # Chup lai trang thai canh bao TRUOC khi dong phien, de sau do biet SV nao
-    # "vua" vuot nguong (co the vi bi diem danh vang hoac chi vi tong so buoi tang len).
-    warned_before = {
-        r["student_id"] for r in compute_class_attendance_stats(db, class_id) if r["warning"]
-    }
-
-    checked_ids = {r.student_id for r in session.records}
-    enrolled = (
-        db.query(models.Enrollment)
-        .filter_by(class_id=class_id)
-        .all()
-    )
-    absent_count = 0
-    for e in enrolled:
-        if e.student_id not in checked_ids:
-            db.add(models.AttendanceRecord(
-                session_id=session_id, student_id=e.student_id, status="absent"))
-            absent_count += 1
-
-    session.status = "closed"
-    session.closed_at = datetime.now()
-    db.commit()
-    _confirm_counts.pop(session_id, None)
-
-    newly_warned = [
-        r for r in compute_class_attendance_stats(db, class_id)
-        if r["warning"] and r["student_id"] not in warned_before
-    ]
-    return {"ok": True, "absent": absent_count,
-            "present": len(checked_ids), "newly_warned": newly_warned}
+    if session.status != "open":
+        raise HTTPException(400, "Phien diem danh da dong truoc do")
+    return close_session_records(db, session)
 
 
 @router.get("/{session_id}/records", response_model=list[schemas.RecordOut])
 def list_records(
     session_id: int,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
 ):
     session = _get_session_or_404(db, session_id)
-    ensure_class_access(user, session.schedule.class_id, db)
+    ensure_class_view(user, session.schedule.class_id, db)
     return (db.query(models.AttendanceRecord)
             .filter_by(session_id=session_id).all())
 
 
 ALLOWED_EDIT_STATUSES = ("present", "late", "absent", "excused")
+EXCUSE_EDITORS = (ROLE_AFFAIRS, ROLE_FACULTY)
 
 
 @router.patch("/{session_id}/records/{record_id}", response_model=schemas.RecordOut)
@@ -475,13 +464,13 @@ def update_record(
     record_id: int,
     body: schemas.RecordUpdate,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN, *EXCUSE_EDITORS)),
 ):
     """Sua trang thai 1 record (vd SV nop don phep sau buoi hoc). Van sua duoc ke ca
     khi phien da dong, nhung bat buoc phai co ly do - moi lan sua deu luu vao
-    AttendanceAudit de sau nay xem lai lich su."""
+    AttendanceAudit. GV lop/admin sua moi trang thai; P.CTSV va Khoa (trong pham vi)
+    chi duyet "Co phep" (-> excused) hoac huy duyet (excused -> absent)."""
     session = _get_session_or_404(db, session_id)
-    ensure_class_access(user, session.schedule.class_id, db)
 
     record = db.get(models.AttendanceRecord, record_id)
     if not record or record.session_id != session_id:
@@ -491,6 +480,17 @@ def update_record(
         raise HTTPException(400, "Trang thai khong hop le")
     if not body.reason.strip():
         raise HTTPException(400, "Can nhap ly do khi sua diem danh")
+
+    if user.role in EXCUSE_EDITORS:
+        if not can_excuse_record(user, record, db):
+            raise HTTPException(403, "Khong co quyen voi sinh vien/lop hoc phan nay")
+        is_excuse = body.status == "excused"
+        is_revert = record.status == "excused" and body.status == "absent"
+        if not (is_excuse or is_revert):
+            raise HTTPException(
+                403, "Phong ban chi duoc duyet 'Co phep' hoac huy duyet ve 'Vang'")
+    else:
+        ensure_class_access(user, session.schedule.class_id, db)
 
     old_status = record.status
     record.status = body.status
@@ -509,11 +509,11 @@ def list_record_audits(
     session_id: int,
     record_id: int,
     db: Session = Depends(get_db),
-    user: models.User = Depends(require_roles("lecturer", "admin")),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
 ):
     """Xem lich su sua diem danh cua 1 record."""
     session = _get_session_or_404(db, session_id)
-    ensure_class_access(user, session.schedule.class_id, db)
+    ensure_class_view(user, session.schedule.class_id, db)
 
     record = db.get(models.AttendanceRecord, record_id)
     if not record or record.session_id != session_id:

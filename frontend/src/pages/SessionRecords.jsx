@@ -4,8 +4,9 @@ import { MapPin } from '@phosphor-icons/react'
 import api from '../api'
 import { API_BASE_URL } from '../config'
 
-const STATUS_OPTIONS = ['present', 'late', 'absent', 'manual']
-const STATUS_LABEL = { present: 'Có mặt', late: 'Muộn', absent: 'Vắng', manual: 'Điểm danh tay' }
+// Backend chi cho sua sang 4 trang thai nay (manual chi tao qua nut xac nhan tay).
+const STATUS_OPTIONS = ['present', 'late', 'absent', 'excused']
+const STATUS_LABEL = { present: 'Có mặt', late: 'Muộn', absent: 'Vắng', excused: 'Có phép', manual: 'Điểm danh tay' }
 const SOURCE_LABEL = { camera: 'Camera lớp học', selfie: 'SV tự chụp', manual: 'Xác nhận tay' }
 
 /** Xem va sua record diem danh sau buoi hoc. */
@@ -33,18 +34,27 @@ export default function SessionRecords() {
   }, [sessionId])
 
   const updateStatus = async (recordId, status) => {
+    // Backend bat buoc ly do cho moi lan sua (luu vao nhat ky attendance_audits).
+    const reason = window.prompt('Lý do sửa trạng thái điểm danh (bắt buộc):')
+    if (!reason || !reason.trim()) return
     setSavingId(recordId)
     try {
-      await api.patch(`/sessions/${sessionId}/records/${recordId}`, { status })
+      await api.patch(`/sessions/${sessionId}/records/${recordId}`, { status, reason: reason.trim() })
       await load()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Không sửa được trạng thái điểm danh.')
     } finally {
       setSavingId(null)
     }
   }
 
   const markManual = async (studentId) => {
-    await api.post(`/sessions/${sessionId}/manual`, { student_id: studentId })
-    await load()
+    try {
+      await api.post(`/sessions/${sessionId}/manual`, { student_id: studentId })
+      await load()
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Không xác nhận được.')
+    }
   }
 
   if (!session || !roster) {
@@ -92,15 +102,18 @@ export default function SessionRecords() {
                           disabled={savingId === record.id}
                           onChange={(e) => updateStatus(record.id, e.target.value)}
                         >
+                          {!STATUS_OPTIONS.includes(record.status) && (
+                            <option value={record.status} disabled>{STATUS_LABEL[record.status] || record.status}</option>
+                          )}
                           {STATUS_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>{STATUS_LABEL[opt]}</option>
                           ))}
                         </select>
-                      ) : (
+                      ) : session.status === 'open' ? (
                         <button className="btn btn-ghost" onClick={() => markManual(s.id)}>
                           Đánh dấu có mặt (tay)
                         </button>
-                      )}
+                      ) : '—'}
                     </td>
                     <td>{record ? record.confidence : '—'}</td>
                     <td>{record ? SOURCE_LABEL[record.source] || record.source : '—'}</td>

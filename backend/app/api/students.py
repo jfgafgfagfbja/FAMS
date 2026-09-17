@@ -5,12 +5,21 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
+                                 student_out)
+from app.core.authz import (STUDENT_MANAGERS, ensure_student_view, filter_students,
+                            validate_faculty_id)
 from app.core.config import settings
 from app.core.security import get_current_user, hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
+from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT,
+                           ROLE_TRAINING)
 
 router = APIRouter(prefix="/students", tags=["students"])
+
+STUDENT_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER)
+ATTENDANCE_DETAIL_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY)
 
 
 def _get_student_or_404(db: Session, student_id: int) -> models.Student:
@@ -20,47 +29,56 @@ def _get_student_or_404(db: Session, student_id: int) -> models.Student:
     return student
 
 
-@router.post("", response_model=schemas.StudentOut,
-             dependencies=[Depends(require_roles("admin"))])
-def create_student(body: schemas.StudentCreate, db: Session = Depends(get_db)):
-    if db.query(models.User).filter(models.User.email == body.email).first():
-        raise HTTPException(400, "Email da ton tai")
+@router.post("", response_model=schemas.StudentOut)
+def create_student(
+    body: schemas.StudentCreate,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(*STUDENT_MANAGERS)),
+):
+    ensure_email_available(db, body.email)
+    if db.query(models.Student).filter_by(student_code=body.student_code).first():
+        raise HTTPException(400, "MSSV da ton tai")
+    validate_faculty_id(db, body.faculty_id)
+
     user = models.User(email=body.email, password_hash=hash_password(body.password),
-                       role="student", full_name=body.full_name)
+                       role=ROLE_STUDENT, full_name=body.full_name)
     db.add(user)
     db.flush()
     student = models.Student(user_id=user.id, student_code=body.student_code,
-                             major=body.major, cohort=body.cohort)
+                             major=body.major, cohort=body.cohort, faculty_id=body.faculty_id)
     db.add(student)
     db.commit()
     db.refresh(student)
-    return _to_out(student)
+    return student_out(student)
 
 
-@router.get("", response_model=list[schemas.StudentOut],
-            dependencies=[Depends(require_roles("admin", "lecturer"))])
+@router.get("", response_model=list[schemas.StudentOut])
 def list_students(
     response: Response,
     q: str | None = None,
+    faculty_id: int | None = None,
     limit: int | None = None,
     offset: int = 0,
     db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*STUDENT_LIST_VIEWERS)),
 ):
-    """Danh sach SV, loc theo q (MSSV hoac ho ten) va phan trang qua limit/offset.
-    Khong truyen limit -> tra ve toan bo (giu tuong thich voi cac noi dang dung
-    danh sach day du, vd dropdown ghi danh). Tong so ban ghi tra qua header
-    X-Total-Count de FE dung cho phan trang ma khong doi shape response cu."""
+    """Danh sach SV trong pham vi xem cua user (Khoa: SV thuoc Khoa, GV: SV lop minh
+    day), loc theo q (MSSV hoac ho ten)/faculty_id va phan trang qua limit/offset.
+    Khong truyen limit -> tra ve toan bo. Tong so ban ghi tra qua header X-Total-Count."""
     query = db.query(models.Student).join(models.User, models.Student.user_id == models.User.id)
+    query = filter_students(query, user, db)
     if q:
         like = f"%{q}%"
         query = query.filter(or_(models.Student.student_code.ilike(like),
                                  models.User.full_name.ilike(like)))
+    if faculty_id is not None:
+        query = query.filter(models.Student.faculty_id == faculty_id)
 
     response.headers["X-Total-Count"] = str(query.count())
     query = query.order_by(models.Student.student_code).offset(offset)
     if limit is not None:
         query = query.limit(limit)
-    return [_to_out(s) for s in query.all()]
+    return [student_out(s) for s in query.all()]
 
 
 @router.get("/me", response_model=schemas.StudentOut)
@@ -68,12 +86,12 @@ def get_my_student_record(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    if user.role != "student":
+    if user.role != ROLE_STUDENT:
         raise HTTPException(403, "Chi sinh vien moi co ho so nay")
     student = db.query(models.Student).filter_by(user_id=user.id).first()
     if not student:
         raise HTTPException(404, "Khong tim thay ho so sinh vien")
-    return _to_out(student)
+    return student_out(student)
 
 
 def compute_student_attendance(
@@ -84,8 +102,7 @@ def compute_student_attendance(
     cac lop da ghi danh. Gom san danh sach tung buoi hoc (ngay, trang thai, gio
     ghi nhan, anh bang chung, vi tri GPS neu la selfie) trong 1 lan goi, tranh N+1.
 
-    Dung chung cho GET /students/me/attendance (chinh SV xem) va
-    GET /parents/me/children/{id}/attendance (phu huynh xem con)."""
+    Dung chung cho SV tu xem, phu huynh xem con va phong ban xem 1 SV."""
     enrollments = student.enrollments
     if not enrollments:
         return []
@@ -158,7 +175,7 @@ def get_my_attendance(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    if user.role != "student":
+    if user.role != ROLE_STUDENT:
         raise HTTPException(403, "Chi sinh vien moi xem duoc muc nay")
     student = db.query(models.Student).filter_by(user_id=user.id).first()
     if not student:
@@ -166,33 +183,64 @@ def get_my_attendance(
     return compute_student_attendance(db, student, semester)
 
 
-@router.get("/{student_id}", response_model=schemas.StudentOut,
-            dependencies=[Depends(require_roles("admin", "lecturer"))])
-def get_student(student_id: int, db: Session = Depends(get_db)):
-    return _to_out(_get_student_or_404(db, student_id))
+@router.get("/{student_id}", response_model=schemas.StudentOut)
+def get_student(
+    student_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*STUDENT_LIST_VIEWERS)),
+):
+    return student_out(ensure_student_view(user, student_id, db))
 
 
-@router.patch("/{student_id}", response_model=schemas.StudentOut,
-              dependencies=[Depends(require_roles("admin"))])
-def update_student(student_id: int, body: schemas.StudentUpdate, db: Session = Depends(get_db)):
+@router.get("/{student_id}/attendance", response_model=list[schemas.MyClassAttendanceOut])
+def get_student_attendance(
+    student_id: int,
+    semester: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*ATTENDANCE_DETAIL_VIEWERS)),
+):
+    """Phong ban/Khoa xem chuyen can chi tiet 1 SV (vd de duyet don xin phep)."""
+    student = ensure_student_view(user, student_id, db)
+    return compute_student_attendance(db, student, semester)
+
+
+@router.patch("/{student_id}", response_model=schemas.StudentOut)
+def update_student(
+    student_id: int,
+    body: schemas.StudentUpdate,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(*STUDENT_MANAGERS)),
+):
     student = _get_student_or_404(db, student_id)
     data = body.model_dump(exclude_unset=True)
+    if "faculty_id" in data:
+        validate_faculty_id(db, data["faculty_id"])
     if "full_name" in data:
         student.user.full_name = data.pop("full_name")
     for field, value in data.items():
         setattr(student, field, value)
     db.commit()
     db.refresh(student)
-    return _to_out(student)
+    return student_out(student)
 
 
-@router.delete("/{student_id}", dependencies=[Depends(require_roles("admin"))])
-def delete_student(student_id: int, db: Session = Depends(get_db)):
+@router.delete("/{student_id}")
+def delete_student(
+    student_id: int,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(*STUDENT_MANAGERS)),
+):
     student = _get_student_or_404(db, student_id)
     if student.enrollments or student.embeddings:
         raise HTTPException(
             409, "Sinh vien da co du lieu dang ky lop/khuon mat, khong the xoa truc tiep")
+    if db.query(models.AttendanceRecord).filter_by(student_id=student_id).first():
+        raise HTTPException(
+            409, "Sinh vien da co du lieu diem danh, khong the xoa (giu lai de doi chieu)")
+
     user = student.user
+    db.query(models.ParentStudent).filter_by(student_id=student_id).delete()
+    delete_user_auth_rows(db, user.id)
     db.delete(student)
     db.delete(user)
     db.commit()
@@ -205,20 +253,13 @@ def give_consent(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """Xac nhan dong y cho phep thu thap du lieu khuon mat. Chi admin hoac chinh SV do."""
+    """Xac nhan dong y cho phep thu thap du lieu khuon mat. Chi chinh SV do, hoac
+    admin/P.CTSV xac nhan ho (vd SV nop ban giay)."""
     student = _get_student_or_404(db, student_id)
-    is_self = user.role == "student" and student.user_id == user.id
-    if not is_self and user.role != "admin":
-        raise HTTPException(403, "Chi sinh vien hoac admin moi xac nhan duoc dong y")
+    is_self = user.role == ROLE_STUDENT and student.user_id == user.id
+    if not is_self and user.role not in STUDENT_MANAGERS:
+        raise HTTPException(403, "Chi sinh vien hoac admin/P.CTSV moi xac nhan duoc dong y")
     student.consent_given = True
     student.consent_given_at = datetime.now()
     db.commit()
     return {"ok": True, "consent_given": True}
-
-
-def _to_out(s: models.Student) -> schemas.StudentOut:
-    return schemas.StudentOut(
-        id=s.id, student_code=s.student_code, full_name=s.user.full_name,
-        major=s.major, cohort=s.cohort, face_enrolled=len(s.embeddings) > 0,
-        consent_given=s.consent_given,
-    )

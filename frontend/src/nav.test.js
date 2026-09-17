@@ -24,6 +24,11 @@ describe('getNavItems', () => {
     const adminPaths = getNavItems('admin').map((i) => i.path)
     expect(adminPaths).toEqual([
       '/', '/admin/students', '/admin/lecturers', '/admin/classes', '/admin/schedules', '/face-review',
+      '/admin/parents',
     ])
+  })
+
+  it('gives parents only their children page', () => {
+    expect(getNavItems('parent').map((i) => i.path)).toEqual(['/'])
   })
 })

@@ -17,6 +17,8 @@ const STATUS_META = {
   present: { label: 'Có mặt', tint: 'success' },
   late: { label: 'Muộn', tint: 'warning' },
   manual: { label: 'Điểm danh tay', tint: 'manual' },
+  absent: { label: 'Vắng', tint: 'danger' },
+  excused: { label: 'Có phép', tint: 'neutral' },
 }
 
 function formatElapsed(totalSeconds) {

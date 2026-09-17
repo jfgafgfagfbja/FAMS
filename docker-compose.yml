@@ -12,7 +12,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fams123}
       POSTGRES_DB: ${POSTGRES_DB:-fams}
     ports:
-      - "5432:5432"
+      # Chi mo tren may chu (khong lo database ra mang LAN).
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -37,7 +38,9 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-no-reply@fams.edu.vn}
     ports:
-      - "8000:8000"
+      # Chi mo tren may chu: nguoi dung (web/app) di qua nginx /api. Backend tin
+      # X-Forwarded-For (--proxy-headers) nen khong duoc de client ngoai goi thang.
+      - "127.0.0.1:8000:8000"
     volumes:
       - evidence:/app/evidence
     depends_on:

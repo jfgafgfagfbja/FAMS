@@ -37,11 +37,12 @@ def test_classes_mine_filters_for_lecturer(client, seed):
     assert [c["id"] for c in resp.json()] == [seed["class1_id"]]
 
 
-def test_classes_without_mine_returns_all(client, seed):
+def test_classes_without_mine_still_scoped_to_own_classes(client, seed):
+    """Giang vien chi thay lop minh day, ke ca khi khong truyen mine (truoc day lo toan truong)."""
     token = login(client, "gv1@test.local", "gv123")
     resp = client.get("/classes", headers=auth_headers(token))
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    assert [c["id"] for c in resp.json()] == [seed["class1_id"]]
 
 
 def test_update_record_status(client, seed):

@@ -115,7 +115,7 @@ function SelfEnrollWizard() {
           <h3 style={{ marginTop: 0 }}>Đồng ý sử dụng dữ liệu khuôn mặt</h3>
           <ul className="consent-list">
             <li>Dữ liệu khuôn mặt của bạn chỉ được dùng để điểm danh tự động tại các buổi học.</li>
-            <li>Hệ thống chỉ lưu một vector đặc trưng khuôn mặt (embedding) — KHÔNG lưu lại ảnh gốc bạn chụp khi đăng ký.</li>
+            <li>Hệ thống lưu một vector đặc trưng khuôn mặt (embedding). Ảnh khuôn mặt bạn chụp chỉ được lưu tạm để cán bộ đối chiếu khi duyệt và bị xóa ngay sau khi duyệt.</li>
             <li>Ảnh chụp làm bằng chứng khi điểm danh (nếu có) chỉ được lưu trong một thời gian nhất định rồi tự động xóa.</li>
             <li>Dữ liệu vừa đăng ký cần quản trị viên duyệt trước khi có hiệu lực nhận diện.</li>
           </ul>

@@ -1,7 +1,7 @@
 """add consent fields and revoked tokens table
 
 Revision ID: 150e85d92f65
-Revises: 
+Revises: 0b5e1a7c2d90
 Create Date: 2026-07-14 08:46:07.612968
 
 """
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '150e85d92f65'
-down_revision: Union[str, Sequence[str], None] = None
+down_revision: Union[str, Sequence[str], None] = '0b5e1a7c2d90'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

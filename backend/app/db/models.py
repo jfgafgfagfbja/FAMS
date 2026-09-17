@@ -7,21 +7,69 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
+# Vai tro nguoi dung. Nhom phong ban (TRAINING/AFFAIRS/FACULTY/BOARD) gan voi 1 don vi
+# qua bang staff - quyen cu the xem core/authz.py.
+ROLE_ADMIN = "admin"
+ROLE_LECTURER = "lecturer"
+ROLE_STUDENT = "student"
+ROLE_PARENT = "parent"
+ROLE_TRAINING = "training_office"    # Phong Dao tao
+ROLE_AFFAIRS = "student_affairs"     # Phong Cong tac sinh vien
+ROLE_FACULTY = "faculty_office"      # Van phong/giao vu Khoa
+ROLE_BOARD = "board"                 # Ban nganh khac (chi xem thong ke tong hop)
+STAFF_ROLES = (ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_BOARD)
+
+# Loai don vi -> vai tro cua can bo thuoc don vi do.
+UNIT_FACULTY = "faculty"
+UNIT_TRAINING = "training"
+UNIT_AFFAIRS = "student_affairs"
+UNIT_BOARD = "board"
+ROLE_BY_UNIT_TYPE = {
+    UNIT_FACULTY: ROLE_FACULTY,
+    UNIT_TRAINING: ROLE_TRAINING,
+    UNIT_AFFAIRS: ROLE_AFFAIRS,
+    UNIT_BOARD: ROLE_BOARD,
+}
+
 
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20))  # admin | lecturer | student | parent
+    # admin | lecturer | student | parent | training_office | student_affairs | faculty_office | board
+    role: Mapped[str] = mapped_column(String(20))
     full_name: Mapped[str] = mapped_column(String(255))
-    # Moc thoi gian doi mat khau gan nhat - token phat truoc moc nay bi coi la thu
-    # hoi (xem core/security.py::get_current_user). Khong the liet ke tung jti da
-    # phat truoc do nen dung moc thoi gian de thu hoi hang loat khi reset mat khau.
+    # Moc thoi gian doi mat khau gan nhat (thong tin doi soat; viec thu hoi token dung
+    # token_version ben duoi).
     credentials_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Tang len moi lan dat lai mat khau; access token mang claim "tv" - lech version la
+    # token cu, bi tu choi ngay (khong phu thuoc do phan giai giay cua "iat").
+    token_version: Mapped[int] = mapped_column(default=0, server_default="0")
 
     student: Mapped["Student | None"] = relationship(back_populates="user")
     lecturer: Mapped["Lecturer | None"] = relationship(back_populates="user")
+
+
+class Unit(Base):
+    """Don vi trong truong: Khoa, Phong Dao tao, Phong Cong tac SV, Ban nganh."""
+    __tablename__ = "units"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    type: Mapped[str] = mapped_column(String(20))  # faculty | training | student_affairs | board
+
+
+class Staff(Base):
+    """Ho so can bo phong ban - 1 user thuoc dung 1 don vi, vai tro suy ra tu loai don vi."""
+    __tablename__ = "staff"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True)
+    unit_id: Mapped[int] = mapped_column(ForeignKey("units.id"))
+    position: Mapped[str] = mapped_column(String(100), default="")
+
+    user: Mapped[User] = relationship()
+    unit: Mapped[Unit] = relationship()
 
 
 class Student(Base):
@@ -31,10 +79,12 @@ class Student(Base):
     student_code: Mapped[str] = mapped_column(String(20), unique=True)
     major: Mapped[str] = mapped_column(String(100), default="")
     cohort: Mapped[int] = mapped_column(default=0)
+    faculty_id: Mapped[int | None] = mapped_column(ForeignKey("units.id"), nullable=True)
     consent_given: Mapped[bool] = mapped_column(default=False)
     consent_given_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="student")
+    faculty: Mapped[Unit | None] = relationship()
     embeddings: Mapped[list["FaceEmbedding"]] = relationship(back_populates="student")
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="student")
 
@@ -45,8 +95,10 @@ class Lecturer(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     lecturer_code: Mapped[str] = mapped_column(String(20), unique=True)
     department: Mapped[str] = mapped_column(String(100), default="")
+    faculty_id: Mapped[int | None] = mapped_column(ForeignKey("units.id"), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="lecturer")
+    faculty: Mapped[Unit | None] = relationship()
 
 
 class Class(Base):
@@ -56,7 +108,11 @@ class Class(Base):
     subject_name: Mapped[str] = mapped_column(String(255))
     lecturer_id: Mapped[int] = mapped_column(ForeignKey("lecturers.id"))
     semester: Mapped[str] = mapped_column(String(20))  # vd: 2026.1
+    # Khoa quan ly hoc phan - quyet dinh pham vi xem cua can bo Khoa.
+    faculty_id: Mapped[int | None] = mapped_column(ForeignKey("units.id"), nullable=True)
 
+    lecturer: Mapped[Lecturer] = relationship()
+    faculty: Mapped[Unit | None] = relationship()
     enrollments: Mapped[list["Enrollment"]] = relationship(back_populates="clazz")
     schedules: Mapped[list["Schedule"]] = relationship(back_populates="clazz")
 
@@ -123,7 +179,7 @@ class AttendanceRecord(Base):
 
 
 class AttendanceAudit(Base):
-    """Luu vet moi lan giang vien/admin sua trang thai 1 attendance record."""
+    """Luu vet moi lan giang vien/admin/phong ban sua trang thai 1 attendance record."""
     __tablename__ = "attendance_audits"
     id: Mapped[int] = mapped_column(primary_key=True)
     record_id: Mapped[int] = mapped_column(ForeignKey("attendance_records.id"))
@@ -142,6 +198,8 @@ class FaceEmbedding(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
     embedding: Mapped[list[float]] = mapped_column(Vector(512))
+    # Anh khuon mat (da cat) luu TAM de can bo doi chieu khi duyet - xoa ngay khi
+    # duyet/tu choi (xem api/faces.py), dung voi dieu khoan dong y cua SV.
     source_image: Mapped[str] = mapped_column(String(500), default="")
     status: Mapped[str] = mapped_column(String(10), default="pending")  # pending | approved | rejected
     reject_reason: Mapped[str] = mapped_column(String(500), default="")
@@ -158,6 +216,20 @@ class RevokedToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime)
 
 
+class RefreshToken(Base):
+    """Refresh token (app mobile). Chi luu SHA-256 cua token; moi lan /auth/refresh xoay
+    vong sang token moi, token cu bi thu hoi. Dung lai token da thu hoi = nghi bi danh
+    cap -> thu hoi toan bo refresh token cua user."""
+    __tablename__ = "refresh_tokens"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)  # UTC
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # UTC
+
+    user: Mapped[User] = relationship()
+
+
 class PasswordReset(Base):
     """Yeu cau dat lai mat khau qua OTP gui email. Khong luu OTP tho, chi luu ban bam."""
     __tablename__ = "password_resets"
@@ -169,17 +241,19 @@ class PasswordReset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship()
+
+
 class Parent(Base):
-    """Tai khoan phu huynh - admin tao va lien ket thu cong voi (cac) con la SV
-    (khong tu dang ky/tu moi qua email, theo dung quy trinh admin quan ly nguoi
-    dung hien co cua he thong)."""
+    """Tai khoan phu huynh - admin/P.CTSV tao va lien ket thu cong voi (cac) con la SV
+    (khong tu dang ky/tu moi qua email, theo dung quy trinh quan ly nguoi dung hien co)."""
     __tablename__ = "parents"
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     phone: Mapped[str] = mapped_column(String(20), default="")
 
     user: Mapped[User] = relationship()
-    children: Mapped[list["ParentStudent"]] = relationship(back_populates="parent")
+    children: Mapped[list["ParentStudent"]] = relationship(
+        back_populates="parent", cascade="all, delete-orphan")
 
 
 class ParentStudent(Base):

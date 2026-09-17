@@ -29,6 +29,7 @@ def frozen_now(monkeypatch):
     """Dong bang datetime.now() trong open_session/recognize + co dinh 2 nguong phut
     (de cac moc gio dung trong test khong phu thuoc config that)."""
     monkeypatch.setattr("app.api.sessions.datetime", _FrozenDatetime)
+    monkeypatch.setattr("app.services.session_service.datetime", _FrozenDatetime)
     monkeypatch.setattr(settings, "EARLY_OPEN_MINUTES", 15)
     monkeypatch.setattr(settings, "LATE_AFTER_MINUTES", 15)
     return FROZEN_NOW

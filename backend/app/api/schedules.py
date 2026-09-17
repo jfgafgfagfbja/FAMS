@@ -5,12 +5,17 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.core.authz import filter_classes
 from app.core.config import settings
 from app.core.security import get_current_user, require_roles
 from app.db import models
 from app.db.database import get_db
+from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT,
+                           ROLE_TRAINING)
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
+
+SCHEDULE_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY)
 
 
 def open_from_time(start: time) -> time:
@@ -20,19 +25,19 @@ def open_from_time(start: time) -> time:
     return (anchor - timedelta(minutes=settings.EARLY_OPEN_MINUTES)).time()
 
 
-@router.get("", response_model=list[schemas.ScheduleWithClassOut],
-            dependencies=[Depends(require_roles("admin"))])
+@router.get("", response_model=list[schemas.ScheduleWithClassOut])
 def list_all_schedules(
     response: Response,
     q: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*SCHEDULE_LIST_VIEWERS)),
 ):
-    """Toan bo lich hoc cua truong kem thong tin lop (dung cho trang quan tri
-    /admin/schedules) - loc theo q (ma lop/ten mon/phong), phan trang qua
-    limit/offset, tong so ban ghi tra qua header X-Total-Count."""
-    query = db.query(models.Schedule).join(models.Class)
+    """Lich hoc kem thong tin lop trong pham vi xem cua user (Khoa: lop Khoa quan ly) -
+    loc theo q (ma lop/ten mon/phong), phan trang qua limit/offset, tong so ban ghi tra
+    qua header X-Total-Count."""
+    query = filter_classes(db.query(models.Schedule).join(models.Class), user, db)
     if q:
         like = f"%{q}%"
         query = query.filter(or_(models.Class.class_code.ilike(like),
@@ -63,22 +68,18 @@ def week_schedule(
     """Lich hoc/day theo tuan (Thu 2 - CN) cua user dang dang nhap, gop san trang
     thai phien diem danh + ket qua tuong ung (neu co) trong 1 lan goi - tranh FE
     phai goi rieng tung buoi (N+1). SV: theo lop da ghi danh. GV: theo lop dang
-    day. Admin: xem toan bo lich cua truong (giong cach /classes tra ve cho admin)."""
+    day. Admin/phong ban: theo pham vi xem lop (Khoa: lop Khoa quan ly)."""
     base = start or date.today()
     monday = base - timedelta(days=base.weekday())
     week_dates = [monday + timedelta(days=i) for i in range(7)]
 
-    if user.role == "student":
+    if user.role == ROLE_STUDENT:
         student = db.query(models.Student).filter_by(user_id=user.id).first()
         class_ids = [e.class_id for e in student.enrollments] if student else []
-    elif user.role == "lecturer":
-        lecturer = db.query(models.Lecturer).filter_by(user_id=user.id).first()
-        class_ids = (
-            [c.id for c in db.query(models.Class).filter_by(lecturer_id=lecturer.id).all()]
-            if lecturer else []
-        )
+    elif user.role in (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER):
+        class_ids = [c.id for c in filter_classes(db.query(models.Class), user, db).all()]
     else:
-        class_ids = [c.id for c in db.query(models.Class).all()]
+        class_ids = []
 
     if not class_ids:
         return []
@@ -105,7 +106,7 @@ def week_schedule(
 
     # SV: trang thai diem danh cua chinh minh cho cac phien trong tuan nay.
     my_status_by_session: dict[int, str] = {}
-    if user.role == "student" and session_ids:
+    if user.role == ROLE_STUDENT and session_ids:
         student = db.query(models.Student).filter_by(user_id=user.id).first()
         if student:
             recs = (
@@ -116,10 +117,10 @@ def week_schedule(
             )
             my_status_by_session = {r.session_id: r.status for r in recs}
 
-    # GV: so SV co mat khi phien da dong + tong so SV ghi danh lop (mot lan truy van cho ca tuan).
+    # Nguoi xem lop (GV/phong ban): so SV co mat khi phien da dong + tong so SV ghi danh lop.
     present_count_by_session: dict[int, int] = {}
     total_count_by_class: dict[int, int] = {}
-    if user.role == "lecturer":
+    if user.role != ROLE_STUDENT:
         closed_ids = [s.id for s in sessions if s.status == "closed"]
         if closed_ids:
             rows = (
@@ -156,7 +157,7 @@ def week_schedule(
             )
             if session:
                 entry.my_status = my_status_by_session.get(session.id)
-                if session.status == "closed":
+                if session.status == "closed" and user.role != ROLE_STUDENT:
                     entry.present_count = present_count_by_session.get(session.id, 0)
                     entry.total_count = total_count_by_class.get(clazz.id, 0)
             result.append(entry)
