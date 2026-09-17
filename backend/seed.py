@@ -54,9 +54,21 @@ def seed():
     db.add(models.Schedule(class_id=clazz.id, weekday=0,
                            start_time=time(7, 0), end_time=time(9, 0),
                            room="P101"))
+    db.flush()
+
+    ph_user = models.User(email="ph01@fams.edu.vn",
+                          password_hash=hash_password("ph123"),
+                          role="parent", full_name="Tran Van Phu")
+    db.add(ph_user)
+    db.flush()
+    ph = models.Parent(user_id=ph_user.id, phone="0900000000")
+    db.add(ph)
+    db.flush()
+    db.add(models.ParentStudent(parent_id=ph.id, student_id=students[0].id))
+
     db.commit()
     print("Seed xong. Tai khoan: admin@fams.edu.vn/admin123, "
-          "gv01@fams.edu.vn/gv123, sv01@fams.edu.vn/sv123")
+          "gv01@fams.edu.vn/gv123, sv01@fams.edu.vn/sv123, ph01@fams.edu.vn/ph123 (phu huynh cua sv01)")
 
 
 if __name__ == "__main__":

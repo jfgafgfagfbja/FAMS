@@ -106,6 +106,57 @@ def enroll_face(db: Session, student_id: int, image_bytes: bytes) -> tuple[bool,
     return True, "Da luu anh, dang cho quan tri vien duyet"
 
 
+# ---------------- SELF CHECK-IN (SV tu chup selfie) ----------------
+
+def recognize_self(db: Session, image_bytes: bytes, student_id: int) -> dict:
+    """Nhan dien anh selfie SV tu chup, CHI so khop voi embedding da duyet cua
+    CHINH student_id do (khac recognize_frame - so voi ca lop) - de tranh 1 SV
+    chup ho/gia mao danh tinh nguoi khac trong luong tu diem danh.
+
+    Tra ve dict: {status, confidence, liveness_score, bbox}
+    status: no_face | multiple_faces | spoof | not_matched | matched
+    """
+    img = _decode_image(image_bytes)
+    faces = get_engine().get(img)
+
+    if len(faces) == 0:
+        return {"status": "no_face", "confidence": 0.0, "liveness_score": None, "bbox": None}
+    if len(faces) > 1:
+        return {"status": "multiple_faces", "confidence": 0.0, "liveness_score": None, "bbox": None}
+
+    face = faces[0]
+    bbox = face.bbox.astype(int).tolist()
+
+    is_real, liveness_score = (True, 1.0)
+    if settings.ANTISPOOF_ENABLED:
+        is_real, liveness_score = antispoof_service.check_liveness(img, face.bbox)
+    if not is_real:
+        return {"status": "spoof", "confidence": 0.0,
+                "liveness_score": liveness_score, "bbox": bbox}
+
+    emb = face.normed_embedding.astype(np.float32)
+    distance = models.FaceEmbedding.embedding.cosine_distance(emb.tolist())
+    nearest = (
+        db.query(distance.label("distance"))
+        .filter(models.FaceEmbedding.student_id == student_id,
+                models.FaceEmbedding.status == "approved")
+        .order_by(distance)
+        .first()
+    )
+    if nearest is None:
+        # Chua co embedding nao duoc duyet cho SV nay
+        return {"status": "not_matched", "confidence": 0.0,
+                "liveness_score": liveness_score, "bbox": bbox}
+
+    conf = round(1 - nearest[0], 3)
+    if conf < settings.RECOGNITION_THRESHOLD:
+        return {"status": "not_matched", "confidence": conf,
+                "liveness_score": liveness_score, "bbox": bbox}
+
+    return {"status": "matched", "confidence": conf,
+            "liveness_score": liveness_score, "bbox": bbox}
+
+
 # ---------------- RECOGNITION ----------------
 
 def recognize_frame(

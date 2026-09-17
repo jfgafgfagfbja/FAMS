@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import auth, classes, faces, lecturers, reports, schedules, sessions, students
+from app.api import auth, classes, faces, lecturers, parents, reports, schedules, sessions, students
 from app.api.auth import limiter
 from app.core.config import settings
 from app.db.database import init_db
@@ -43,7 +43,8 @@ app.add_middleware(
 )
 
 for router in (auth.router, students.router, classes.router, lecturers.router,
-               faces.router, sessions.router, reports.router, schedules.router):
+               faces.router, sessions.router, reports.router, schedules.router,
+               parents.router):
     app.include_router(router)
 
 os.makedirs(settings.EVIDENCE_DIR, exist_ok=True)

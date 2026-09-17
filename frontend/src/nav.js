@@ -1,6 +1,6 @@
 import {
   House, CalendarBlank, ClipboardText, Camera, Users, GraduationCap,
-  ChalkboardTeacher, ChartBar, FingerprintSimple,
+  ChalkboardTeacher, ChartBar, FingerprintSimple, UsersThree,
 } from '@phosphor-icons/react'
 
 export function getNavItems(role) {
@@ -10,6 +10,12 @@ export function getNavItems(role) {
       { path: '/schedule', label: 'Lịch học', icon: CalendarBlank },
       { path: '/my-attendance', label: 'Chuyên cần của tôi', icon: ClipboardText },
       { path: '/enroll', label: 'Đăng ký khuôn mặt', icon: Camera },
+    ]
+  }
+
+  if (role === 'parent') {
+    return [
+      { path: '/', label: 'Con em của tôi', icon: UsersThree },
     ]
   }
 
@@ -29,5 +35,6 @@ export function getNavItems(role) {
     { path: '/admin/classes', label: 'Lớp học phần', icon: GraduationCap },
     { path: '/admin/schedules', label: 'Lịch học', icon: CalendarBlank },
     { path: '/face-review', label: 'Duyệt khuôn mặt', icon: FingerprintSimple },
+    { path: '/admin/parents', label: 'Phụ huynh', icon: UsersThree },
   ]
 }

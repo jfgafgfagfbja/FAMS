@@ -2,6 +2,12 @@ services:
   db:
     image: pgvector/pgvector:pg16
     environment:
+      # Dong bo voi TZ cua backend ben duoi: checked_at (attendance_records) dung
+      # server_default=func.now() tinh phia Postgres, neu container nay khong co
+      # TZ se mac dinh UTC va lech gio thuc te. Voi volume da khoi tao tu truoc,
+      # bien nay chi co hieu luc that su khi da chay migration a18f6c2b9e40
+      # (ALTER DATABASE ... SET timezone) - xem alembic/versions/.
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
       POSTGRES_USER: ${POSTGRES_USER:-fams}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fams123}
       POSTGRES_DB: ${POSTGRES_DB:-fams}
@@ -18,9 +24,18 @@ services:
   backend:
     build: ./backend
     environment:
+      # Container mac dinh chay UTC; datetime.now() (gio muon, lich hoc hom nay...)
+      # can dung gio Viet Nam de khop voi nguoi dung that. tzdata da co san trong
+      # image python:3.11-slim nen chi can khai bao TZ, khong can cai them goi.
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
       DATABASE_URL: postgresql://${POSTGRES_USER:-fams}:${POSTGRES_PASSWORD:-fams123}@db:5432/${POSTGRES_DB:-fams}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-prod}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@fams.edu.vn}
     ports:
       - "8000:8000"
     volumes:

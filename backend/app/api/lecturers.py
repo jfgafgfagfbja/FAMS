@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.schedules import open_from_time
 from app.core.security import get_current_user, hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
@@ -111,6 +112,7 @@ def my_today_schedules(
             schedule_id=s.id, class_id=s.class_id, class_code=s.clazz.class_code,
             subject_name=s.clazz.subject_name, weekday=s.weekday,
             start_time=s.start_time, end_time=s.end_time, room=s.room,
+            open_from=open_from_time(s.start_time),
         )
         for s in schedules
     ]

@@ -2,7 +2,8 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import schemas
@@ -46,16 +47,46 @@ def open_session(
     db: Session = Depends(get_db),
     user: models.User = Depends(require_roles("lecturer", "admin")),
 ):
+    """Mo phien diem danh. Chi cho mo khi: dung ngay hom nay, dung thu cua lich hoc,
+    trong khung [start_time - EARLY_OPEN_MINUTES, end_time] va chua co phien nao cua
+    cung lich hoc trong ngay (moi rang buoc sai tra 400 voi message rieng)."""
     schedule = db.get(models.Schedule, body.schedule_id)
     if not schedule:
         raise HTTPException(404, "Lich hoc khong ton tai")
     ensure_class_access(user, schedule.class_id, db)
 
+    now = datetime.now()
+    if body.session_date != now.date():
+        raise HTTPException(400, "Chi duoc mo phien diem danh cho ngay hom nay")
+    if body.session_date.weekday() != schedule.weekday:
+        raise HTTPException(400, "Ngay diem danh khong dung thu cua lich hoc nay")
+
+    open_from = datetime.combine(body.session_date, schedule.start_time) - timedelta(
+        minutes=settings.EARLY_OPEN_MINUTES)
+    if now < open_from:
+        raise HTTPException(400, f"Chua den gio - chi mo duoc phien tu {open_from:%H:%M}")
+    if now > datetime.combine(body.session_date, schedule.end_time):
+        raise HTTPException(400, "Tiet hoc da ket thuc, khong the mo phien diem danh")
+
+    existed = (
+        db.query(models.AttendanceSession)
+        .filter_by(schedule_id=body.schedule_id, session_date=body.session_date)
+        .first()
+    )
+    if existed:
+        raise HTTPException(400, "Da co phien diem danh cho lich hoc nay trong ngay hom nay")
+
     session = models.AttendanceSession(
         schedule_id=body.schedule_id, session_date=body.session_date
     )
     db.add(session)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # 2 request mo phien gan nhu dong thoi: kiem tra existed o tren deu chua thay
+        # phien nao, UNIQUE(schedule_id, session_date) o DB chan request den sau.
+        db.rollback()
+        raise HTTPException(400, "Da co phien diem danh cho lich hoc nay trong ngay hom nay")
     db.refresh(session)
     return session
 
@@ -143,6 +174,10 @@ def session_roster(
             evidence_image=r.evidence_image if r else None,
             checked_at=r.checked_at if r else None,
             record_id=r.id if r else None,
+            source=r.source if r else None,
+            latitude=r.latitude if r else None,
+            longitude=r.longitude if r else None,
+            location_accuracy=r.location_accuracy if r else None,
         ))
     return result
 
@@ -230,7 +265,8 @@ async def recognize(
             db.add(models.AttendanceRecord(
                 session_id=session_id, student_id=student.id,
                 status="late" if late else "present",
-                confidence=m["confidence"], evidence_image=evidence_path))
+                confidence=m["confidence"], evidence_image=evidence_path,
+                source="camera"))
             db.commit()
             status = "recognized"
             evidence = evidence_path
@@ -267,11 +303,111 @@ def manual_check(
         raise HTTPException(400, "Sinh vien nay da co record trong phien nay")
 
     record = models.AttendanceRecord(
-        session_id=session_id, student_id=body.student_id, status="manual")
+        session_id=session_id, student_id=body.student_id, status="manual",
+        source="manual")
     db.add(record)
     db.commit()
     db.refresh(record)
     return record
+
+
+@router.post("/{session_id}/self-checkin", response_model=schemas.SelfCheckinResult)
+async def self_checkin(
+    session_id: int,
+    frame: UploadFile = File(...),
+    latitude: float | None = Form(None),
+    longitude: float | None = Form(None),
+    accuracy: float | None = Form(None),
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles("student")),
+):
+    """SV tu chup selfie de diem danh (khac luong GV quet camera ca lop o
+    /recognize): chi nhan dien so voi khuon mat cua CHINH SV dang dang nhap
+    (recognize_self), kem toa do GPS lay tu trinh duyet (neu SV cho phep) de
+    lam bang chung thoi gian + dia diem diem danh."""
+    session = _get_session_or_404(db, session_id)
+    if session.status != "open":
+        raise HTTPException(404, "Phien khong ton tai hoac da dong")
+
+    student = db.query(models.Student).filter_by(user_id=user.id).first()
+    if not student:
+        raise HTTPException(404, "Khong tim thay ho so sinh vien")
+
+    class_id = session.schedule.class_id
+    enrolled = (
+        db.query(models.Enrollment)
+        .filter_by(class_id=class_id, student_id=student.id)
+        .first()
+    )
+    if not enrolled:
+        raise HTTPException(403, "Ban khong ghi danh lop hoc phan nay")
+
+    existed = (
+        db.query(models.AttendanceRecord)
+        .filter_by(session_id=session_id, student_id=student.id)
+        .first()
+    )
+    if existed:
+        return schemas.SelfCheckinResult(
+            status="already_checked", record_id=existed.id, record_status=existed.status,
+            evidence_image=existed.evidence_image or None, confidence=existed.confidence,
+            message="Ban da diem danh phien nay roi")
+
+    data = await frame.read()
+    result = face_service.recognize_self(db, data, student.id)
+
+    if result["status"] == "no_face":
+        return schemas.SelfCheckinResult(
+            status="no_face", message="Khong tim thay khuon mat trong anh, hay thu lai")
+    if result["status"] == "multiple_faces":
+        return schemas.SelfCheckinResult(
+            status="multiple_faces",
+            message="Anh co nhieu hon 1 khuon mat, hay chup rieng minh ban de he thong xac dinh dung danh tinh")
+    if result["status"] == "spoof":
+        evidence_path = _save_evidence(data, session_id)
+        return schemas.SelfCheckinResult(
+            status="spoof", liveness_score=result["liveness_score"], evidence_image=evidence_path,
+            message="Anh nghi la gia mao (anh in/anh chup lai man hinh), vui long chup truc tiep")
+    if result["status"] == "not_matched":
+        return schemas.SelfCheckinResult(
+            status="not_matched", confidence=result["confidence"],
+            liveness_score=result["liveness_score"],
+            message="Khuon mat khong khop voi du lieu da dang ky cua ban. "
+                    "Neu chua dang ky khuon mat, hay vao muc \"Dang ky khuon mat\" truoc.")
+
+    # matched: dung gio hay muon giong luong camera - so voi gio bat dau tiet + LATE_AFTER_MINUTES
+    start = datetime.combine(session.session_date, session.schedule.start_time)
+    late = datetime.now() > start + timedelta(minutes=settings.LATE_AFTER_MINUTES)
+    evidence_path = _save_evidence(data, session_id)
+    record = models.AttendanceRecord(
+        session_id=session_id, student_id=student.id,
+        status="late" if late else "present",
+        confidence=result["confidence"], evidence_image=evidence_path,
+        source="selfie", latitude=latitude, longitude=longitude, location_accuracy=accuracy,
+    )
+    db.add(record)
+    try:
+        db.commit()
+    except IntegrityError:
+        # 2 request tu diem danh gan nhu dong thoi (vd double-click): UNIQUE
+        # (session_id, student_id) chan o DB, tra ve record da co thay vi loi 500.
+        db.rollback()
+        existed = (
+            db.query(models.AttendanceRecord)
+            .filter_by(session_id=session_id, student_id=student.id)
+            .first()
+        )
+        return schemas.SelfCheckinResult(
+            status="already_checked", record_id=existed.id if existed else None,
+            record_status=existed.status if existed else None,
+            message="Ban da diem danh phien nay roi")
+    db.refresh(record)
+    return schemas.SelfCheckinResult(
+        status="recognized", confidence=result["confidence"],
+        liveness_score=result["liveness_score"], evidence_image=evidence_path,
+        record_id=record.id, record_status=record.status,
+        message="Diem danh thanh cong",
+    )
 
 
 @router.patch("/{session_id}/close")

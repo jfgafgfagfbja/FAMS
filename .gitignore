@@ -10,6 +10,9 @@ backend/models/*.pth
 frontend/node_modules/
 frontend/dist/
 frontend/.env
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.auth-cache.json
 
 .DS_Store
 
@@ -17,3 +20,8 @@ frontend/.env
 .agents/
 .claude/
 skills-lock.json
+
+# Bien moi truong that (chi commit .env.example)
+.env
+# Tai lieu/slide sinh rieng, khong thuoc ma nguon
+Claude outputs/

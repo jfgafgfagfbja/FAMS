@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { WarningCircle, ClipboardText, EnvelopeSimple } from '@phosphor-icons/react'
+import { WarningCircle, ClipboardText, EnvelopeSimple, MapPin } from '@phosphor-icons/react'
 import api from '../api'
 import { API_BASE_URL } from '../config'
 import { formatSemester, parseSemesterLabel } from '../utils/format'
@@ -10,6 +10,7 @@ const STATUS_LABEL = {
 const STATUS_TINT = {
   present: 'success', late: 'warning', absent: 'danger', manual: 'success', excused: 'neutral',
 }
+const SOURCE_LABEL = { camera: 'Camera lớp học', selfie: 'Tự chụp (selfie)', manual: 'GV xác nhận tay' }
 
 function absencesUntilBanned(row) {
   if (!row.total_sessions) return 0
@@ -161,7 +162,9 @@ export default function MyAttendance() {
                                       <th>Ngày</th>
                                       <th>Trạng thái</th>
                                       <th>Giờ ghi nhận</th>
+                                      <th>Nguồn</th>
                                       <th>Ảnh bằng chứng</th>
+                                      <th>Vị trí</th>
                                       <th></th>
                                     </tr>
                                   </thead>
@@ -175,6 +178,7 @@ export default function MyAttendance() {
                                           </span>
                                         </td>
                                         <td>{s.checked_at ? new Date(s.checked_at).toLocaleTimeString() : '—'}</td>
+                                        <td>{s.source ? SOURCE_LABEL[s.source] || s.source : '—'}</td>
                                         <td>
                                           {s.evidence_image ? (
                                             <img
@@ -183,6 +187,20 @@ export default function MyAttendance() {
                                               style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)' }}
                                               alt={`Bằng chứng điểm danh ngày ${s.session_date}`}
                                             />
+                                          ) : '—'}
+                                        </td>
+                                        <td>
+                                          {s.latitude != null && s.longitude != null ? (
+                                            <a
+                                              href={`https://www.google.com/maps?q=${s.latitude},${s.longitude}`}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="btn btn-ghost"
+                                              style={{ padding: '5px 10px', fontSize: 12 }}
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <MapPin size={13} /> Bản đồ
+                                            </a>
                                           ) : '—'}
                                         </td>
                                         <td>

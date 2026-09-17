@@ -64,3 +64,16 @@ export function formatDDMMYYYY(d) {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   return `${day}/${m}/${d.getFullYear()}`
 }
+
+/** "HH:MM:SS" (hoac "HH:MM") -> "HH:MM" de hien thi. */
+export function hhmm(timeStr) {
+  return (timeStr || '').slice(0, 5)
+}
+
+/** now (Date) co nam trong khung duoc mo phien [open_from, end_time] khong?
+ * open_from/endTime la chuoi "HH:MM:SS" backend tra ve - so sanh chuoi la du
+ * vi cung dinh dang co dinh. Backend van la noi kiem tra cuoi cung. */
+export function isWithinOpenWindow(openFrom, endTime, now = new Date()) {
+  const hms = now.toTimeString().slice(0, 8)
+  return hms >= (openFrom || '').slice(0, 8) && hms <= (endTime || '').slice(0, 8)
+}

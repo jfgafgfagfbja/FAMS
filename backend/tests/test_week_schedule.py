@@ -10,10 +10,12 @@ def _this_monday() -> date:
 
 
 def test_week_schedule_student_sees_own_class_and_manual_status(client, seed):
-    monday = _this_monday()  # schedule1 co weekday=0 (Thu 2)
+    # schedule1 duoc seed vao thu cua NGAY HOM NAY (open_session chi cho mo hom nay)
+    monday = _this_monday()
+    today = date.today()
     gv_token = login(client, "gv1@test.local", "gv123")
     open_resp = client.post(
-        "/sessions", json={"schedule_id": seed["schedule1_id"], "session_date": str(monday)},
+        "/sessions", json={"schedule_id": seed["schedule1_id"], "session_date": str(today)},
         headers=auth_headers(gv_token),
     )
     session_id = open_resp.json()["id"]
@@ -27,7 +29,7 @@ def test_week_schedule_student_sees_own_class_and_manual_status(client, seed):
     assert len(entries) == 1
     entry = entries[0]
     assert entry["class_code"] == "C1"
-    assert entry["date"] == str(monday)
+    assert entry["date"] == str(today)
     assert entry["session_status"] == "open"
     assert entry["my_status"] == "manual"
 
@@ -36,7 +38,7 @@ def test_week_schedule_lecturer_sees_present_count_after_close(client, seed):
     monday = _this_monday()
     gv_token = login(client, "gv1@test.local", "gv123")
     open_resp = client.post(
-        "/sessions", json={"schedule_id": seed["schedule1_id"], "session_date": str(monday)},
+        "/sessions", json={"schedule_id": seed["schedule1_id"], "session_date": str(date.today())},
         headers=auth_headers(gv_token),
     )
     session_id = open_resp.json()["id"]
@@ -79,4 +81,6 @@ def test_week_schedule_normalizes_non_monday_start_to_that_week(client, seed):
     resp = client.get("/schedules/week", params={"start": str(mid_week)}, headers=auth_headers(sv_token))
     assert resp.status_code == 200
     entry = resp.json()[0]
-    assert entry["date"] == str(monday)  # van tra ve Thu 2 cua tuan chua ngay duoc truyen vao
+    # van tra ve dung ngay cua slot trong tuan chua ngay duoc truyen vao
+    # (schedule1 nam o thu cua hom nay - xem fixture seed)
+    assert entry["date"] == str(date.today())

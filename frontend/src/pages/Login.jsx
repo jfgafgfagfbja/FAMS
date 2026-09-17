@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../api'
 
 export default function Login() {
@@ -76,6 +76,10 @@ export default function Login() {
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </button>
+
+        <Link to="/forgot-password" style={{ fontSize: 13, color: 'var(--accent)', textAlign: 'center' }}>
+          Quên mật khẩu?
+        </Link>
       </form>
     </div>
   )

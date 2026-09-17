@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, ClipboardText, WarningCircle, CalendarBlank, Camera } from '@phosphor-icons/react'
+import { CalendarCheck, ClipboardText, WarningCircle, CalendarBlank, Camera, GraduationCap } from '@phosphor-icons/react'
 import api from '../api'
 import StatCard from '../components/StatCard'
 import AttendanceDonut from '../components/AttendanceDonut'
@@ -110,27 +110,51 @@ export default function StudentDashboard() {
         </Link>
       </div>
 
-      <div className="card" style={{ padding: 20 }}>
-        <h3 style={{ marginTop: 0, fontSize: 15 }}>Tiến độ chuyên cần theo lớp</h3>
-        {rows.length ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
-            {rows.map((r) => (
-              <div key={r.class_code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                <AttendanceDonut
-                  present={r.total_sessions - r.absent}
-                  total={r.total_sessions}
-                  label="buổi có mặt"
-                />
-                <span style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>{r.class_code}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="empty-state">
-            <ClipboardText size={32} />
-            <p>Bạn chưa ghi danh lớp học phần nào nên chưa có dữ liệu chuyên cần.</p>
-          </div>
-        )}
+      <div className="dashboard-split">
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>Tiến độ chuyên cần theo lớp</h3>
+          {rows.length ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24 }}>
+              {rows.map((r) => (
+                <div key={r.class_code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <AttendanceDonut
+                    present={r.total_sessions - r.absent}
+                    total={r.total_sessions}
+                    label="buổi có mặt"
+                  />
+                  <span style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'center' }}>{r.class_code}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <ClipboardText size={32} />
+              <p>Bạn chưa ghi danh lớp học phần nào nên chưa có dữ liệu chuyên cần.</p>
+            </div>
+          )}
+        </div>
+
+        <div className="card" style={{ padding: 20 }}>
+          <h3 style={{ marginTop: 0, fontSize: 15 }}>Lớp học phần</h3>
+          {me.classes.length ? (
+            <div>
+              {me.classes.map((c) => (
+                <div key={c.id} className="class-list-row">
+                  <div>
+                    <div className="class-list-code">{c.class_code}</div>
+                    <div className="class-list-subject">{c.subject_name}</div>
+                  </div>
+                  <span className="tag tag-neutral">{c.semester}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <GraduationCap size={28} />
+              <p>Bạn chưa ghi danh lớp học phần nào.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -2,6 +2,7 @@
 from datetime import date
 
 from app.core.config import settings
+from app.db import models
 from app.services import face_service
 from tests.conftest import auth_headers, login
 
@@ -68,22 +69,22 @@ def test_reaching_threshold_creates_exactly_one_record(client, seed, monkeypatch
     assert len(records_after) == 1
 
 
-def test_confirm_counts_are_isolated_per_session(client, seed, monkeypatch):
+def test_confirm_counts_are_isolated_per_session(client, seed, db_session, monkeypatch):
     """Dem theo tung session_id rieng, khong lan sang phien khac."""
     monkeypatch.setattr(settings, "CONFIRM_FRAMES", 2)
     token, session_id_1 = _open_session(client, seed)
     monkeypatch.setattr(face_service, "recognize_frame", _fake_recognize(seed["sv1_id"]))
     _send_frame(client, session_id_1, token)  # count=1 cho session_id_1
 
-    # dong phien 1 roi mo phien 2 (cung lich, ngay khac trong nam - DB cho phep vi
-    # UniqueConstraint la (session_id, student_id) chu khong rang buoc theo schedule)
+    # dong phien 1 roi tao phien 2 truc tiep qua ORM (open_session gio chi cho mo
+    # phien cua ngay hom nay + chan trung (schedule_id, session_date), nen phien
+    # "ngay khac" phai dung du lieu dung san thay vi goi API)
     client.patch(f"/sessions/{session_id_1}/close", headers=auth_headers(token))
-    resp2 = client.post(
-        "/sessions",
-        json={"schedule_id": seed["schedule1_id"], "session_date": "2020-01-01"},
-        headers=auth_headers(token),
-    )
-    session_id_2 = resp2.json()["id"]
+    session2 = models.AttendanceSession(
+        schedule_id=seed["schedule1_id"], session_date=date(2020, 1, 1), status="open")
+    db_session.add(session2)
+    db_session.commit()
+    session_id_2 = session2.id
 
     first = _send_frame(client, session_id_2, token)
     assert first.json()[0]["status"] == "confirming"

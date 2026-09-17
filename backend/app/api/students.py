@@ -76,22 +76,16 @@ def get_my_student_record(
     return _to_out(student)
 
 
-@router.get("/me/attendance", response_model=list[schemas.MyClassAttendanceOut])
-def get_my_attendance(
-    semester: str | None = None,
-    db: Session = Depends(get_db),
-    user: models.User = Depends(get_current_user),
-):
-    """Chuyen can chi tiet cua chinh SV dang dang nhap, loc theo hoc ky (Class.semester,
-    dang luu dang "YYYY.N"). Khong truyen semester -> lay hoc ky moi nhat (so sanh chuoi)
-    trong cac lop da ghi danh. Gom san danh sach tung buoi hoc de FE mo rong chi tiet
-    (ngay, trang thai, gio ghi nhan, anh bang chung) trong 1 lan goi, tranh N+1."""
-    if user.role != "student":
-        raise HTTPException(403, "Chi sinh vien moi xem duoc muc nay")
-    student = db.query(models.Student).filter_by(user_id=user.id).first()
-    if not student:
-        raise HTTPException(404, "Khong tim thay ho so sinh vien")
+def compute_student_attendance(
+    db: Session, student: models.Student, semester: str | None,
+) -> list[schemas.MyClassAttendanceOut]:
+    """Chuyen can chi tiet cua 1 SV, loc theo hoc ky (Class.semester, dang luu
+    "YYYY.N"). Khong truyen semester -> lay hoc ky moi nhat (so sanh chuoi) trong
+    cac lop da ghi danh. Gom san danh sach tung buoi hoc (ngay, trang thai, gio
+    ghi nhan, anh bang chung, vi tri GPS neu la selfie) trong 1 lan goi, tranh N+1.
 
+    Dung chung cho GET /students/me/attendance (chinh SV xem) va
+    GET /parents/me/children/{id}/attendance (phu huynh xem con)."""
     enrollments = student.enrollments
     if not enrollments:
         return []
@@ -137,6 +131,10 @@ def get_my_attendance(
                 confidence=r.confidence if r else None,
                 evidence_image=r.evidence_image if r else None,
                 record_id=r.id if r else None,
+                source=r.source if r else None,
+                latitude=r.latitude if r else None,
+                longitude=r.longitude if r else None,
+                location_accuracy=r.location_accuracy if r else None,
             ))
 
         total_sessions = len(sessions)
@@ -152,6 +150,20 @@ def get_my_attendance(
             sessions=session_details,
         ))
     return result
+
+
+@router.get("/me/attendance", response_model=list[schemas.MyClassAttendanceOut])
+def get_my_attendance(
+    semester: str | None = None,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    if user.role != "student":
+        raise HTTPException(403, "Chi sinh vien moi xem duoc muc nay")
+    student = db.query(models.Student).filter_by(user_id=user.id).first()
+    if not student:
+        raise HTTPException(404, "Khong tim thay ho so sinh vien")
+    return compute_student_attendance(db, student, semester)
 
 
 @router.get("/{student_id}", response_model=schemas.StudentOut,

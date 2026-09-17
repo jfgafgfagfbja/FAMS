@@ -13,8 +13,12 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(20))  # admin | lecturer | student
+    role: Mapped[str] = mapped_column(String(20))  # admin | lecturer | student | parent
     full_name: Mapped[str] = mapped_column(String(255))
+    # Moc thoi gian doi mat khau gan nhat - token phat truoc moc nay bi coi la thu
+    # hoi (xem core/security.py::get_current_user). Khong the liet ke tung jti da
+    # phat truoc do nen dung moc thoi gian de thu hoi hang loat khi reset mat khau.
+    credentials_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     student: Mapped["Student | None"] = relationship(back_populates="user")
     lecturer: Mapped["Lecturer | None"] = relationship(back_populates="user")
@@ -82,6 +86,9 @@ class Schedule(Base):
 
 class AttendanceSession(Base):
     __tablename__ = "attendance_sessions"
+    # Moi lich hoc chi co toi da 1 phien diem danh trong 1 ngay - chan mo trung
+    # o tang DB (open_session cung kiem tra truoc de tra 400 de hieu).
+    __table_args__ = (UniqueConstraint("schedule_id", "session_date"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     schedule_id: Mapped[int] = mapped_column(ForeignKey("schedules.id"))
     session_date: Mapped[date] = mapped_column(Date)
@@ -103,6 +110,13 @@ class AttendanceRecord(Base):
     status: Mapped[str] = mapped_column(String(10))  # present | late | absent | manual | excused
     confidence: Mapped[float] = mapped_column(Float, default=0.0)
     evidence_image: Mapped[str] = mapped_column(String(500), default="")
+    # Nguon tao record: camera (GV quet ca lop), selfie (SV tu chup + GPS trinh
+    # duyet), manual (GV xac nhan tay). latitude/longitude/location_accuracy chi
+    # co gia tri khi source="selfie".
+    source: Mapped[str] = mapped_column(String(10), default="camera")
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     session: Mapped[AttendanceSession] = relationship(back_populates="records")
     student: Mapped[Student] = relationship()
@@ -142,3 +156,40 @@ class RevokedToken(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     jti: Mapped[str] = mapped_column(String(36), unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class PasswordReset(Base):
+    """Yeu cau dat lai mat khau qua OTP gui email. Khong luu OTP tho, chi luu ban bam."""
+    __tablename__ = "password_resets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    otp_hash: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship()
+class Parent(Base):
+    """Tai khoan phu huynh - admin tao va lien ket thu cong voi (cac) con la SV
+    (khong tu dang ky/tu moi qua email, theo dung quy trinh admin quan ly nguoi
+    dung hien co cua he thong)."""
+    __tablename__ = "parents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    phone: Mapped[str] = mapped_column(String(20), default="")
+
+    user: Mapped[User] = relationship()
+    children: Mapped[list["ParentStudent"]] = relationship(back_populates="parent")
+
+
+class ParentStudent(Base):
+    """Lien ket phu huynh <-> sinh vien. 1 phu huynh co the theo doi nhieu con,
+    1 SV co the duoc nhieu phu huynh theo doi (vd ca cha lan me)."""
+    __tablename__ = "parent_students"
+    __table_args__ = (UniqueConstraint("parent_id", "student_id"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    parent_id: Mapped[int] = mapped_column(ForeignKey("parents.id"))
+    student_id: Mapped[int] = mapped_column(ForeignKey("students.id"))
+
+    parent: Mapped[Parent] = relationship(back_populates="children")
+    student: Mapped[Student] = relationship()

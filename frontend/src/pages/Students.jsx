@@ -175,32 +175,32 @@ export default function Students() {
             {modalMode === 'create' && (
               <>
                 <div className="field">
-                  <label>Email</label>
-                  <input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                  <label htmlFor="sv-email">Email</label>
+                  <input id="sv-email" required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
                 </div>
                 <div className="field">
-                  <label>Mật khẩu</label>
-                  <input required minLength={6} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                  <label htmlFor="sv-password">Mật khẩu</label>
+                  <input id="sv-password" required minLength={6} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
                 </div>
               </>
             )}
             <div className="field">
-              <label>Họ tên</label>
-              <input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
+              <label htmlFor="sv-full-name">Họ tên</label>
+              <input id="sv-full-name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
             </div>
             {modalMode === 'create' && (
               <div className="field">
-                <label>MSSV</label>
-                <input required value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })} />
+                <label htmlFor="sv-code">MSSV</label>
+                <input id="sv-code" required value={form.student_code} onChange={(e) => setForm({ ...form, student_code: e.target.value })} />
               </div>
             )}
             <div className="field">
-              <label>Ngành</label>
-              <input value={form.major} onChange={(e) => setForm({ ...form, major: e.target.value })} />
+              <label htmlFor="sv-major">Ngành</label>
+              <input id="sv-major" value={form.major} onChange={(e) => setForm({ ...form, major: e.target.value })} />
             </div>
             <div className="field">
-              <label>Khóa</label>
-              <input type="number" min="2000" value={form.cohort} onChange={(e) => setForm({ ...form, cohort: e.target.value })} />
+              <label htmlFor="sv-cohort">Khóa</label>
+              <input id="sv-cohort" type="number" min="2000" value={form.cohort} onChange={(e) => setForm({ ...form, cohort: e.target.value })} />
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
               <button type="submit" className="btn btn-primary" disabled={submitting}>

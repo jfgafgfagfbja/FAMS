@@ -1,5 +1,5 @@
 import re
-from datetime import time
+from datetime import datetime, time, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -108,10 +108,26 @@ def seed(db_session):
     db.flush()
 
     db.add(models.Enrollment(student_id=sv1.id, class_id=class1.id))
-    schedule1 = models.Schedule(class_id=class1.id, weekday=0, start_time=time(7, 0),
-                                end_time=time(9, 0), room="P101")
-    schedule2 = models.Schedule(class_id=class2.id, weekday=1, start_time=time(7, 0),
-                                end_time=time(9, 0), room="P102")
+
+    # open_session gio chi cho mo phien: dung ngay hom nay, dung thu, trong khung
+    # [start - EARLY_OPEN_MINUTES, end]. Neo lich vao "bay gio" de cac test mo phien
+    # qua API van hop le: bat dau ~10 phut nua (nam trong khung mo som, va check-in
+    # ngay sau do van truoc gio hoc -> "present"), ket thuc ~3 tieng nua. Clamp ve
+    # cuoi ngay de gio khong trao nguoc khi test chay sat nua dem.
+    now = datetime.now()
+    start_dt = now + timedelta(minutes=10)
+    end_dt = now + timedelta(hours=3)
+    sched_start = (start_dt.time().replace(microsecond=0)
+                   if start_dt.date() == now.date() else time(23, 58))
+    sched_end = (end_dt.time().replace(microsecond=0)
+                 if end_dt.date() == now.date() else time(23, 59, 59))
+
+    schedule1 = models.Schedule(class_id=class1.id, weekday=now.weekday(),
+                                start_time=sched_start, end_time=sched_end, room="P101")
+    # schedule2 co y de vao thu KHAC hom nay - khong test nao can mo phien cho no
+    # qua API (chi dung kiem tra 403/CRUD), va giu duoc tinh "2 lich khac thu".
+    schedule2 = models.Schedule(class_id=class2.id, weekday=(now.weekday() + 1) % 7,
+                                start_time=sched_start, end_time=sched_end, room="P102")
     db.add_all([schedule1, schedule2])
     db.commit()
 

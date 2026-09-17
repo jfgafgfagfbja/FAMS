@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { CalendarBlank, CaretLeft, CaretRight, Printer } from '@phosphor-icons/react'
+import { CalendarBlank, Camera, CaretLeft, CaretRight, Printer } from '@phosphor-icons/react'
 import api from '../api'
-import { WEEKDAYS, addDays, formatDDMMYYYY, toISODate, toMonday } from '../utils/format'
+import ToastStack, { useToasts } from '../components/ToastStack'
+import { WEEKDAYS, addDays, formatDDMMYYYY, hhmm, isWithinOpenWindow, toISODate, toMonday } from '../utils/format'
 
 const role = sessionStorage.getItem('role')
 const canOpenSession = role === 'lecturer'
@@ -37,6 +38,14 @@ export default function Schedule() {
   const [weekStart, setWeekStart] = useState(() => toMonday(new Date()))
   const [slots, setSlots] = useState(null)
   const [opening, setOpening] = useState(null)
+  const [toasts, pushToast] = useToasts()
+  // Tick moi 30s de nut "Mo phien" tu hien/an khi buoc vao/ra khoi khung gio hop le
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -56,6 +65,8 @@ export default function Schedule() {
         schedule_id: scheduleId, session_date: toISODate(new Date()),
       })
       navigate(`/attendance/${data.id}`)
+    } catch (err) {
+      pushToast(err.response?.data?.detail || 'Không mở được phiên điểm danh')
     } finally {
       setOpening(null)
     }
@@ -72,6 +83,8 @@ export default function Schedule() {
 
   return (
     <div>
+      <ToastStack toasts={toasts} />
+
       <div className="week-nav">
         <span className="week-nav-range">
           {formatDDMMYYYY(days[0])} – {formatDDMMYYYY(days[6])}
@@ -134,6 +147,7 @@ export default function Schedule() {
                             slot={s}
                             isToday={iso === todayISO}
                             isPast={iso < todayISO}
+                            now={now}
                             opening={opening === s.schedule_id}
                             onOpenSession={() => openSession(s.schedule_id)}
                           />
@@ -158,7 +172,7 @@ export default function Schedule() {
   )
 }
 
-function ScheduleSlot({ slot, isToday, isPast, opening, onOpenSession }) {
+function ScheduleSlot({ slot, isToday, isPast, now, opening, onOpenSession }) {
   const timeLabel = `${slot.start_time.slice(0, 5)}–${slot.end_time.slice(0, 5)}`
   const body = (
     <>
@@ -170,10 +184,22 @@ function ScheduleSlot({ slot, isToday, isPast, opening, onOpenSession }) {
 
   if (role === 'student') {
     const badge = (isPast || isToday) ? SV_STATUS_BADGE[slot.my_status] : null
+    // Chi cho tu diem danh khi phien dang mo HOM NAY va chinh SV chua co ket qua nao.
+    const canSelfCheckin = isToday && slot.session_status === 'open' && !slot.my_status
     return (
       <div className="timetable-slot">
         {body}
         {badge && <span className={`timetable-slot-badge tag-${badge.tint}`}>{badge.label}</span>}
+        {canSelfCheckin && (
+          <Link
+            to={`/self-checkin/${slot.session_id}`}
+            state={{ classCode: slot.class_code, subjectName: slot.subject_name, room: slot.room }}
+            className="btn btn-primary no-print"
+            style={{ padding: '4px 8px', fontSize: 11, alignSelf: 'flex-start', textDecoration: 'none' }}
+          >
+            <Camera size={13} weight="bold" /> Tự điểm danh
+          </Link>
+        )}
       </div>
     )
   }
@@ -195,10 +221,12 @@ function ScheduleSlot({ slot, isToday, isPast, opening, onOpenSession }) {
         </Link>
       )
     }
+    const withinWindow = isWithinOpenWindow(slot.open_from, slot.end_time, now)
+    const beforeWindow = now.toTimeString().slice(0, 8) < (slot.open_from || '')
     return (
       <div className="timetable-slot">
         {body}
-        {isToday && canOpenSession && (
+        {isToday && canOpenSession && withinWindow && (
           <button
             className="btn btn-primary no-print"
             style={{ padding: '4px 8px', fontSize: 11, alignSelf: 'flex-start' }}
@@ -207,6 +235,14 @@ function ScheduleSlot({ slot, isToday, isPast, opening, onOpenSession }) {
           >
             {opening ? 'Đang mở…' : 'Mở phiên'}
           </button>
+        )}
+        {isToday && canOpenSession && beforeWindow && (
+          <span
+            className="timetable-slot-badge tag-neutral no-print"
+            title={`Chỉ mở được từ ${hhmm(slot.open_from)}`}
+          >
+            Mở từ {hhmm(slot.open_from)}
+          </span>
         )}
       </div>
     )

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { MapPin } from '@phosphor-icons/react'
 import api from '../api'
 import { API_BASE_URL } from '../config'
 
 const STATUS_OPTIONS = ['present', 'late', 'absent', 'manual']
 const STATUS_LABEL = { present: 'Có mặt', late: 'Muộn', absent: 'Vắng', manual: 'Điểm danh tay' }
+const SOURCE_LABEL = { camera: 'Camera lớp học', selfie: 'SV tự chụp', manual: 'Xác nhận tay' }
 
 /** Xem va sua record diem danh sau buoi hoc. */
 export default function SessionRecords() {
@@ -69,7 +71,9 @@ export default function SessionRecords() {
                 <th>Họ tên</th>
                 <th>Trạng thái</th>
                 <th>Độ tin cậy</th>
+                <th>Nguồn</th>
                 <th>Ảnh bằng chứng</th>
+                <th>Vị trí</th>
                 <th>Giờ ghi nhận</th>
               </tr>
             </thead>
@@ -99,6 +103,7 @@ export default function SessionRecords() {
                       )}
                     </td>
                     <td>{record ? record.confidence : '—'}</td>
+                    <td>{record ? SOURCE_LABEL[record.source] || record.source : '—'}</td>
                     <td>
                       {record?.evidence_image ? (
                         <img
@@ -112,13 +117,26 @@ export default function SessionRecords() {
                         '—'
                       )}
                     </td>
+                    <td>
+                      {record?.latitude != null && record?.longitude != null ? (
+                        <a
+                          href={`https://www.google.com/maps?q=${record.latitude},${record.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-ghost"
+                          style={{ padding: '5px 10px', fontSize: 12 }}
+                        >
+                          <MapPin size={13} /> Bản đồ
+                        </a>
+                      ) : '—'}
+                    </td>
                     <td>{record ? new Date(record.checked_at).toLocaleTimeString() : '—'}</td>
                   </tr>
                 )
               })}
               {!roster.length && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
                     Lớp này chưa có sinh viên ghi danh
                   </td>
                 </tr>

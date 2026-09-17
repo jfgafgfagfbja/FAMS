@@ -1,6 +1,6 @@
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 # ---- Auth ----
@@ -8,6 +8,27 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    # str thuong, khong dung EmailStr: day la tra cuu email DA TON TAI (giong
+    # OAuth2PasswordRequestForm.username o /auth/login), khong phai tao moi, nen
+    # khong can/khong nen ep dinh dang - email khong hop le don gian se khong
+    # khop user nao va van nhan thong bao chung nhu binh thuong.
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mat khau moi phai co it nhat 8 ky tu")
+        return v
 
 
 # ---- Student ----
@@ -162,6 +183,18 @@ class RecognizeResult(BaseModel):
     confirm_needed: int | None = None  # so frame can de xac nhan (settings.CONFIRM_FRAMES)
 
 
+class SelfCheckinResult(BaseModel):
+    """Ket qua khi SV tu chup selfie diem danh (chi so khop voi khuon mat cua
+    CHINH SV do, khac voi RecognizeResult cua luong camera lop hoc quet nhieu mat)."""
+    status: str  # recognized | already_checked | not_matched | no_face | multiple_faces | spoof
+    confidence: float = 0.0
+    liveness_score: float | None = None
+    evidence_image: str | None = None
+    record_id: int | None = None
+    record_status: str | None = None  # present | late (khi status=recognized/already_checked)
+    message: str = ""
+
+
 class RecordOut(BaseModel):
     id: int
     student_id: int
@@ -169,6 +202,10 @@ class RecordOut(BaseModel):
     status: str
     confidence: float
     evidence_image: str = ""
+    source: str = "camera"
+    latitude: float | None = None
+    longitude: float | None = None
+    location_accuracy: float | None = None
 
     class Config:
         from_attributes = True
@@ -208,6 +245,10 @@ class RosterEntryOut(BaseModel):
     evidence_image: str | None = None
     checked_at: datetime | None = None
     record_id: int | None = None
+    source: str | None = None  # camera | selfie | manual
+    latitude: float | None = None
+    longitude: float | None = None
+    location_accuracy: float | None = None
 
 
 class TodayScheduleOut(BaseModel):
@@ -220,6 +261,9 @@ class TodayScheduleOut(BaseModel):
     start_time: time
     end_time: time
     room: str
+    # Gio som nhat duoc mo phien (= start_time - EARLY_OPEN_MINUTES), tinh san o
+    # backend de FE khong phai hardcode nguong cau hinh.
+    open_from: time
 
 
 class MyAttendanceSessionOut(BaseModel):
@@ -231,6 +275,10 @@ class MyAttendanceSessionOut(BaseModel):
     confidence: float | None = None
     evidence_image: str | None = None
     record_id: int | None = None
+    source: str | None = None  # camera | selfie | manual
+    latitude: float | None = None
+    longitude: float | None = None
+    location_accuracy: float | None = None
 
 
 class MyClassAttendanceOut(BaseModel):
@@ -280,6 +328,9 @@ class WeekSlotOut(BaseModel):
     end_time: time
     session_id: int | None = None
     session_status: str | None = None  # None (chua mo phien) | open | closed
+    # Gio som nhat duoc mo phien (= start_time - EARLY_OPEN_MINUTES) - GV dung de
+    # biet nut "Mo phien" hop le tu luc nao ma khong phai hardcode nguong o FE.
+    open_from: time | None = None
     my_status: str | None = None  # SV: trang thai diem danh cua chinh minh (neu co)
     present_count: int | None = None  # GV: so SV co mat khi phien da dong
     total_count: int | None = None  # GV: tong so SV ghi danh lop
@@ -331,3 +382,35 @@ class FacePendingOut(BaseModel):
 
 class FaceRejectBody(BaseModel):
     reason: str
+# ---- Parent ----
+class ParentCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone: str = ""
+
+
+class ParentUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+
+
+class ParentOut(BaseModel):
+    id: int
+    full_name: str
+    email: str
+    phone: str = ""
+    child_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ParentLinkChild(BaseModel):
+    student_code: str
+
+
+class ParentChildOut(StudentOut):
+    """StudentOut mo rong voi danh sach lop hoc phan - dung cho GET /parents/me/children
+    de phu huynh co san danh sach hoc ky/lop ma khong phai goi them API khac."""
+    classes: list[MeClassBrief] = []

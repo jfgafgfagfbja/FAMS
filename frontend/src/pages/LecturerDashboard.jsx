@@ -6,7 +6,8 @@ import {
 } from '@phosphor-icons/react'
 import api from '../api'
 import StatCard from '../components/StatCard'
-import { formatSemester } from '../utils/format'
+import ToastStack, { useToasts } from '../components/ToastStack'
+import { formatSemester, hhmm, isWithinOpenWindow, toISODate } from '../utils/format'
 
 /** Dashboard giang vien: the dem nhanh + lich day hom nay + mo phien diem danh + shortcut. */
 export default function LecturerDashboard() {
@@ -16,6 +17,14 @@ export default function LecturerDashboard() {
   const [openCount, setOpenCount] = useState(0)
   const [warningCount, setWarningCount] = useState(0)
   const [opening, setOpening] = useState(null)
+  const [toasts, pushToast] = useToasts()
+  // Tick moi 30s de nut "Mo phien" tu hien/an khi buoc vao/ra khoi khung gio hop le
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -55,9 +64,11 @@ export default function LecturerDashboard() {
     try {
       const { data } = await api.post('/sessions', {
         schedule_id: scheduleId,
-        session_date: new Date().toISOString().slice(0, 10),
+        session_date: toISODate(new Date()),
       })
       navigate(`/attendance/${data.id}`)
+    } catch (err) {
+      pushToast(err.response?.data?.detail || 'Không mở được phiên điểm danh')
     } finally {
       setOpening(null)
     }
@@ -76,6 +87,8 @@ export default function LecturerDashboard() {
 
   return (
     <div>
+      <ToastStack toasts={toasts} />
+
       <div className="stat-grid stat-grid-3">
         <StatCard icon={CalendarCheck} label="Buổi dạy hôm nay" value={todaySchedules.length} tint="accent" to="/schedule" />
         <StatCard icon={ClipboardText} label="Phiên đang mở" value={openCount} tint="accent" to="/sessions" />
@@ -123,13 +136,23 @@ export default function LecturerDashboard() {
                     <MapPin size={13} style={{ verticalAlign: -2 }} /> Phòng {s.room}
                   </div>
                 </div>
-                <button
-                  className="btn btn-primary"
-                  onClick={() => openSession(s.schedule_id)}
-                  disabled={opening === s.schedule_id}
-                >
-                  {opening === s.schedule_id ? 'Đang mở…' : 'Mở phiên điểm danh'}
-                </button>
+                {isWithinOpenWindow(s.open_from, s.end_time, now) ? (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => openSession(s.schedule_id)}
+                    disabled={opening === s.schedule_id}
+                  >
+                    {opening === s.schedule_id ? 'Đang mở…' : 'Mở phiên điểm danh'}
+                  </button>
+                ) : now.toTimeString().slice(0, 8) > s.end_time ? (
+                  <button className="btn" disabled title="Tiết học đã kết thúc">
+                    Đã kết thúc
+                  </button>
+                ) : (
+                  <button className="btn" disabled title={`Chỉ mở được từ ${hhmm(s.open_from)}`}>
+                    {`Chỉ mở được từ ${hhmm(s.open_from)}`}
+                  </button>
+                )}
               </div>
             ))}
           </div>

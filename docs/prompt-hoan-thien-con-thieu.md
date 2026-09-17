@@ -117,11 +117,86 @@ Nhiệm vụ B — giảm bundle (~750KB):
 
 ---
 
+## PROMPT E — Sửa logic mở phiên điểm danh (check-in sớm + chặn phiên sai)
+
+```
+[BỐI CẢNH CHUNG]
+
+Boi canh loi: open_session trong api/sessions.py hien KHONG kiem tra thoi gian,
+dan den 3 lo hong: (1) mo duoc phien cho ngay qua khu/tuong lai bat ky,
+(2) mo duoc 2 phien trung cho cung schedule + ngay -> SV bi ghi trung record,
+(3) session_date khong can khop weekday cua schedule. Ngoai ra SV den som
+khong check-in duoc chi vi giang vien chua bam mo phien (khong phai loi code
+nhung can ho tro quy trinh).
+
+Nhiệm vụ:
+1. Thêm settings.EARLY_OPEN_MINUTES (mặc định 15) vào core/config.py.
+2. Sửa open_session — chỉ cho mở phiên khi TẤT CẢ điều kiện sau đúng, sai
+   điều kiện nào trả 400 kèm message tiếng Việt rõ ràng cho điều kiện đó:
+   a) session_date là hôm nay (theo giờ server).
+   b) session_date.weekday() == schedule.weekday (quy ước 0 = thứ 2 sẵn có).
+   c) Giờ hiện tại trong khung [start_time - EARLY_OPEN_MINUTES, end_time].
+   d) Chưa tồn tại phiên nào (mọi status) của cùng schedule_id + session_date.
+3. Chặn ở tầng DB: UniqueConstraint("schedule_id", "session_date") trên
+   attendance_sessions + migration Alembic tương ứng. Trước khi viết migration,
+   kiểm tra dữ liệu trùng sẵn có và xử lý (giữ phiên mới nhất, log phiên bị bỏ).
+4. SV đến sớm trong khung EARLY_OPEN_MINUTES check-in bình thường và tính
+   "present" (logic late hiện tại đã đúng — xác nhận lại bằng test, không sửa).
+5. Frontend: nút "Mở phiên" trên dashboard GV và lịch tuần chỉ hiện khi trong
+   khung giờ hợp lệ; ngoài khung hiện tooltip "Chỉ mở được từ HH:mm". Xử lý
+   message 400 từ backend hiển thị toast.
+6. Test: mở phiên ngoài khung giờ / sai ngày / sai weekday / trùng phiên đều
+   400 đúng message; mở trong khung sớm 15 phút OK; check-in trước giờ học
+   ra "present", sau start + LATE_AFTER_MINUTES ra "late".
+```
+
+---
+
+## PROMPT F — Admin đổi mật khẩu hộ người dùng
+
+```
+[BỐI CẢNH CHUNG]
+
+Boi canh: SV quen mat khau hien khong co duong nao lay lai neu chua cau hinh
+SMTP (luong OTP o Prompt C). Can them thao tac admin doi mat khau ho — day la
+luong chuan cac truong van dung (SV len phong dao tao xin cap lai).
+
+Nhiệm vụ:
+1. Backend — POST /users/{user_id}/reset-password (admin only):
+   - Server TỰ SINH mật khẩu tạm 10 ký tự (chữ hoa/thường/số, tránh ký tự dễ
+     nhầm 0/O/l/1), KHÔNG cho admin tự nhập (tránh admin đặt pass đoán được).
+   - Hash bằng hash_password sẵn có, lưu, và trả mật khẩu tạm dạng plain
+     TRONG response DUY NHẤT lần này (không lưu plain ở đâu khác, không log).
+   - Thu hồi toàn bộ token đang hoạt động của user đó (cơ chế revoked_tokens
+     sẵn có; nếu chưa revoke được theo user thì bổ sung như mô tả Prompt C).
+   - Thêm cột must_change_password (bool, default False) vào users + migration:
+     đặt True khi admin reset; /auth/login trả kèm cờ này.
+2. Bắt đổi mật khẩu lần đăng nhập kế: endpoint POST /auth/change-password
+   (mật khẩu cũ + mới; user tự gọi được bất kỳ lúc nào). Khi must_change_password
+   = True, frontend sau login điều hướng thẳng tới trang đổi mật khẩu, không
+   cho vào trang khác tới khi đổi xong (đổi xong tắt cờ).
+3. Frontend:
+   - /admin/students (và lecturers): thêm nút "Cấp lại mật khẩu" mỗi dòng →
+     confirm → modal hiện mật khẩu tạm MỘT LẦN, nút copy, cảnh báo "sẽ không
+     xem lại được, hãy gửi cho sinh viên ngay".
+   - Trang /change-password dùng chung (đổi bắt buộc sau reset + đổi tự nguyện
+     trong menu user góc phải).
+4. Ghi audit: ai reset mật khẩu của ai, lúc nào (bảng audit sẵn có hoặc bảng
+   user_audits mới, KHÔNG lưu mật khẩu).
+5. Test: role khác admin gọi reset bị 403; sau reset token cũ hết hiệu lực;
+   login bằng pass tạm trả must_change_password=true; đổi xong cờ tắt và
+   login bình thường.
+```
+
+---
+
 ## Thứ tự đề xuất
 
 | # | Prompt | Lý do |
 |---|---|---|
 | 1 | A | Chốt trạng thái sạch trước khi thêm code mới |
-| 2 | B | Demo được ngay khi clone + đóng lỗ hổng quyền riêng tư |
-| 3 | C | Tính năng người dùng thật sẽ cần sớm nhất |
-| 4 | D | Test E2E làm cuối để phủ luôn B và C; code-split kèm theo |
+| 2 | E | Lỗi logic nghiệp vụ — sửa sớm trước khi dữ liệu thật bị bẩn |
+| 3 | F | SV quên mật khẩu là tình huống xảy ra ngay tuần đầu triển khai |
+| 4 | B | Demo được ngay khi clone + đóng lỗ hổng quyền riêng tư |
+| 5 | C | OTP email tự phục vụ (bổ sung cho F khi có SMTP) |
+| 6 | D | Test E2E làm cuối để phủ tất cả; code-split kèm theo |

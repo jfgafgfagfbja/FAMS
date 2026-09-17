@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     RECOGNITION_THRESHOLD: float = 0.45   # nguong cosine de nhan dien
     DUPLICATE_THRESHOLD: float = 0.60     # nguong canh bao trung khi enrollment
     LATE_AFTER_MINUTES: int = 15          # sau X phut tinh la muon
+    EARLY_OPEN_MINUTES: int = 15          # duoc mo phien som X phut truoc gio bat dau tiet
     EVIDENCE_DIR: str = "./evidence"
     EVIDENCE_RETENTION_DAYS: int = 90     # anh bang chung qua han bi xoa tu dong
     CORS_ORIGINS: str = "http://localhost:5173"  # phan cach boi dau phay
@@ -17,6 +18,15 @@ class Settings(BaseSettings):
     ANTISPOOF_MODEL_PATH: str = "./models/2.7_80x80_MiniFASNetV2.onnx"
     CONFIRM_FRAMES: int = 2                # so frame can nhan dien du de ghi attendance record
     ABSENCE_WARN_RATIO: float = 0.2        # ti le vang (khong tinh excused) -> canh bao cam thi
+
+    # Quen mat khau (OTP qua email) - SMTP_HOST rong = chua cau hinh, email_service
+    # se chi log OTP ra console kem canh bao "DEV MODE" thay vi gui that.
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    MAIL_FROM: str = "no-reply@fams.edu.vn"
+    OTP_EXPIRE_MINUTES: int = 10
 
     class Config:
         env_file = ".env"

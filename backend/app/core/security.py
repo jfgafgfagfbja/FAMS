@@ -24,8 +24,9 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_access_token(user_id: int, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "role": role, "exp": expire, "jti": uuid.uuid4().hex}
+    now = datetime.utcnow()
+    expire = now + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(user_id), "role": role, "exp": expire, "iat": now, "jti": uuid.uuid4().hex}
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -54,6 +55,21 @@ def get_current_user(
     user = db.get(models.User, user_id)
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User khong ton tai")
+
+    # Token phat truoc lan doi mat khau gan nhat (vd qua quen mat khau) bi coi la
+    # da thu hoi - khong the liet ke tung jti da phat truoc do nen dung moc thoi
+    # gian de thu hoi hang loat. Token cu (phat truoc khi co tinh nang nay) khong
+    # co "iat" nen bo qua kiem tra, khong lam gian doan phien dang dang nhap.
+    iat = payload.get("iat")
+    if user.credentials_changed_at and iat is not None:
+        issued_at = datetime.utcfromtimestamp(iat)
+        # So sanh o do phan giai GIAY: "iat" trong JWT bi lam tron xuong giay chan,
+        # con credentials_changed_at co microsecond - neu giu nguyen thi token phat
+        # ra NGAY SAU khi doi mat khau (cung giay) cung bi coi la cu va tra 401 oan.
+        if issued_at < user.credentials_changed_at.replace(microsecond=0):
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                "Token da bi thu hoi do doi mat khau, vui long dang nhap lai")
 
     request.state.token_payload = payload
     return user

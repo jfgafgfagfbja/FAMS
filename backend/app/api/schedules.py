@@ -1,15 +1,23 @@
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.core.config import settings
 from app.core.security import get_current_user, require_roles
 from app.db import models
 from app.db.database import get_db
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
+
+
+def open_from_time(start: time) -> time:
+    """Gio som nhat duoc mo phien cho tiet bat dau luc `start`
+    (= start - EARLY_OPEN_MINUTES). Dung chung cho cac response tra lich ve FE."""
+    anchor = datetime.combine(date(2000, 1, 1), start)
+    return (anchor - timedelta(minutes=settings.EARLY_OPEN_MINUTES)).time()
 
 
 @router.get("", response_model=list[schemas.ScheduleWithClassOut],
@@ -142,6 +150,7 @@ def week_schedule(
                 date=d, weekday=weekday, schedule_id=sch.id, class_id=clazz.id,
                 class_code=clazz.class_code, subject_name=clazz.subject_name,
                 room=sch.room, start_time=sch.start_time, end_time=sch.end_time,
+                open_from=open_from_time(sch.start_time),
                 session_id=session.id if session else None,
                 session_status=session.status if session else None,
             )
