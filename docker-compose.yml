@@ -48,12 +48,14 @@ services:
         condition: service_healthy
 
   frontend:
+    # Giao dien Flutter web (mobile/) - cung ma nguon voi app Android/iOS. Goi API qua
+    # nginx proxy /api (xem mobile/nginx.conf), khong goi thang backend:8000.
+    # Luu y: trinh duyet chi cho dung camera tren HTTPS hoac localhost - trien khai that
+    # can dat reverse proxy HTTPS phia truoc cong nay.
     build:
-      context: ./frontend
+      context: ./mobile
       args:
-        # Frontend goi qua nginx proxy /api (xem frontend/nginx.conf), khong goi
-        # thang backend:8000 - tranh CORS va lo dia chi noi bo trong production.
-        VITE_API_URL: /api
+        API_BASE_URL: /api
     ports:
       - "5173:80"
     depends_on:

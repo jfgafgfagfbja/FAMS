@@ -1,45 +1,58 @@
 # FAMS — Face Attendance Management System
 
-Hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện khuôn mặt.
+Hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện khuôn mặt — Trường Đại học Kiến trúc Đà Nẵng.
 
 ## Kiến trúc tóm tắt
 
 - **Backend**: FastAPI + SQLAlchemy 2.0 + PostgreSQL 16 (extension `pgvector`).
-  - Auth: JWT (access token) với thu hồi token (`revoked_tokens`, claim `jti`), rate-limit bằng `slowapi`.
-  - Phân quyền: theo role (`admin`/`lecturer`/`student`) và theo lớp (giảng viên chỉ thao tác được lớp mình dạy — `core/authz.py`).
-  - Nhận diện khuôn mặt: InsightFace `buffalo_l` (SCRFD detector + ArcFace embedding 512 chiều) chạy qua ONNX Runtime CPU. Embedding lưu ở cột `Vector(512)` (pgvector), so khớp bằng cosine distance (`<=>`), có index HNSW.
-  - Chống giả mạo (anti-spoofing): MiniFASNetV2 ONNX, tự tắt (no-op) nếu thiếu file model — cấu hình ở `ANTISPOOF_ENABLED/THRESHOLD/MODEL_PATH`.
-  - Xác nhận đa khung hình: một sinh viên phải được nhận diện đủ `CONFIRM_FRAMES` khung liên tiếp mới được ghi điểm danh (đếm trong bộ nhớ, không lưu qua restart).
-  - Nhật ký chỉnh sửa điểm danh (audit trail): mọi sửa `status` bản ghi điểm danh đều yêu cầu `reason` và được lưu vào `attendance_audits`.
-  - Cảnh báo tỷ lệ vắng (`ABSENCE_WARN_RATIO`) và xuất báo cáo Excel (`openpyxl`) — ma trận điểm danh + tổng hợp theo lớp.
-  - Schema quản lý bằng Alembic (xem mục Migrations bên dưới). `init_db()` giờ chỉ tạo extension `vector` và chỉ dùng cho dev/test/seed, KHÔNG dùng để tạo bảng ở production.
-- **Frontend**: React 18 + Vite, react-router-dom, axios (tự đính JWT, tự điều hướng `/login` khi 401), react-webcam + canvas overlay để vẽ khung nhận diện realtime, Recharts cho biểu đồ, Phosphor icons.
-- **Triển khai**: `docker-compose.yml` ở gốc dự án dựng 3 service `db` (Postgres 16 + pgvector), `backend` (chạy `alembic upgrade head` rồi `uvicorn`), `frontend` (build tĩnh bằng Vite, phục vụ bằng nginx, nginx proxy `/api/` sang backend để tránh CORS).
+  - Auth: JWT access token (thu hồi qua `revoked_tokens`/`jti`, thu hồi hàng loạt khi đổi mật khẩu qua `users.token_version`) + **refresh token xoay vòng** cho app mobile (`POST /auth/refresh`, dùng lại token cũ ⇒ thu hồi toàn bộ).
+  - Rate limit đăng nhập theo IP thật (uvicorn `--proxy-headers` sau nginx) **và** theo tài khoản (nhiều SV dùng chung IP wifi trường/4G).
+  - Phân quyền theo vai trò + phạm vi dữ liệu (`core/authz.py`), xem bảng **Phân quyền** bên dưới.
+  - Nhận diện khuôn mặt: InsightFace `buffalo_l` (SCRFD + ArcFace 512 chiều) qua ONNX Runtime CPU; embedding ở cột `Vector(512)` (pgvector), so khớp cosine có index HNSW. Ảnh mặt khi đăng ký chỉ lưu tạm để cán bộ đối chiếu, xóa ngay khi duyệt/từ chối; SV tự xem/xóa dữ liệu khuôn mặt của mình.
+  - Chống giả mạo: MiniFASNetV2 ONNX, tự tắt nếu thiếu model (`ANTISPOOF_*`).
+  - Xác nhận đa khung hình: SV phải được nhận diện đủ `CONFIRM_FRAMES` lần trong phiên mới ghi điểm danh.
+  - Phiên điểm danh: chỉ mở trong khung `[giờ bắt đầu − EARLY_OPEN_MINUTES, giờ kết thúc]`; sau `giờ kết thúc + SESSION_GRACE_MINUTES` không nhận điểm danh và **tự động đóng** (sinh bản ghi vắng).
+  - Ảnh bằng chứng trả về dạng **URL có chữ ký HMAC** hết hạn (`MEDIA_URL_EXPIRE_MINUTES`), không còn thư mục `/evidence` công khai.
+  - Thời gian trả về kèm múi giờ (`+07:00`). Nhật ký sửa điểm danh bắt buộc lý do (`attendance_audits`). Cảnh báo vắng (`ABSENCE_WARN_RATIO`), xuất Excel, thống kê tổng hợp theo Khoa (`GET /reports/overview`).
+- **App (Flutter — `mobile/`)**: một mã nguồn cho **Web, Android, iOS** (Dio + tự refresh token, go_router chặn route theo vai trò, camera, geolocator, fl_chart). Chi tiết: [mobile/README.md](mobile/README.md).
+- **Web React cũ (`frontend/`)**: giữ tạm để đối chiếu, không còn được build trong Docker Compose.
+- **Triển khai**: `docker-compose.yml` dựng `db` (Postgres 16 + pgvector), `backend` (`alembic upgrade head` rồi `uvicorn`), `frontend` (build Flutter web, nginx proxy `/api/` sang backend).
 
 ```
 FAMS/
-├── docs/                  # Tài liệu thiết kế (kiến trúc, ERD, thiết kế chi tiết)
-├── docker-compose.yml     # Dựng db + backend + frontend
-├── .env.example           # Bien moi truong cho docker-compose (root)
+├── docs/                  # Tài liệu thiết kế
+├── docker-compose.yml     # db + backend + frontend (Flutter web)
 ├── backend/               # FastAPI + InsightFace + PostgreSQL/pgvector
-│   ├── Dockerfile
-│   ├── entrypoint.sh      # alembic upgrade head -> uvicorn
-│   ├── alembic/           # Migrations (baseline + các bản sau)
-│   ├── seed.py            # Tạo tài khoản/dữ liệu mẫu
-│   ├── tests/              # pytest + httpx (Postgres thật, xem mục Test)
+│   ├── alembic/           # Migrations (baseline 0b5e1a7c2d90 → head)
+│   ├── seed.py            # Dữ liệu mẫu + đơn vị + tài khoản cán bộ
+│   ├── tests/             # pytest (Postgres thật)
 │   └── app/
-│       ├── main.py        # Entry point
-│       ├── core/          # Config, security (JWT)
-│       ├── db/            # Database, models SQLAlchemy
-│       ├── api/           # Routes: auth, students, classes, faces, sessions, reports
-│       ├── services/      # face_service: enrollment + recognition
-│       └── schemas.py     # Pydantic schemas
-└── frontend/              # React + Vite
-    ├── nginx.conf         # Proxy /api/ -> backend (dùng khi build docker)
-    └── src/
-        ├── pages/         # Login, Dashboard, AttendanceScreen, EnrollFace, ...
-        └── api.js         # Axios client
+│       ├── api/           # auth, students, lecturers, classes, schedules, sessions, faces,
+│       │                  # reports, parents, units, staff, media
+│       ├── core/          # config, security (JWT/refresh), authz (ma trận quyền), media (URL ký), timeutil
+│       ├── services/      # face_service, session_service (đóng/tự đóng phiên), attendance_stats…
+│       └── schemas.py
+├── mobile/                # App Flutter (Web/Android/iOS)
+└── frontend/              # Web React cũ (sẽ gỡ)
 ```
+
+## Phân quyền
+
+| Chức năng | Admin | P. Đào tạo | P. CTSV | Khoa | Ban ngành |
+|---|---|---|---|---|---|
+| Tài khoản cán bộ, đơn vị | Sửa | – | – | – | – |
+| Lớp học phần, lịch học, ghi danh | Sửa | Sửa | Xem | Xem* | – |
+| Hồ sơ & phân công giảng viên | Sửa | Sửa | – | Xem* | – |
+| Hồ sơ sinh viên, phụ huynh | Sửa | Xem | Sửa | Xem* (SV) | – |
+| Duyệt khuôn mặt | Sửa | – | Sửa | – | – |
+| Điểm danh chi tiết + ảnh bằng chứng | Sửa | Xem | Xem | Xem* | – |
+| Duyệt "Có phép" / hủy duyệt | Sửa | – | Sửa | Sửa* | – |
+| Cảnh báo vắng, xuất Excel | Xem | Xem | Xem | Xem* | – |
+| Thống kê tổng hợp (chỉ số liệu) | Xem | Xem | Xem | Xem* | Xem |
+
+\* chỉ trong phạm vi Khoa của mình (SV/GV/lớp được gán `faculty_id`). **Giảng viên**: mở phiên, quét camera, xác nhận tay, sửa điểm danh lớp mình dạy. **Sinh viên**: lịch, tự điểm danh, chuyên cần, dữ liệu khuôn mặt của mình. **Phụ huynh**: chuyên cần của con được liên kết.
+
+Vai trò cán bộ suy ra từ loại đơn vị khi admin tạo tài khoản (`/staff`): Khoa → `faculty_office`, Phòng Đào tạo → `training_office`, Phòng CTSV → `student_affairs`, Ban ngành → `board`.
 
 ## Chạy dự án (dev, không dùng Docker)
 
@@ -51,76 +64,69 @@ pip install -r requirements.txt
 copy .env.example .env                          # sửa DATABASE_URL, SECRET_KEY...
 ```
 
-Cần Postgres có sẵn extension `pgvector` (đơn giản nhất: `docker compose up -d db` — xem bên dưới). Sau đó:
+Cần Postgres có extension `pgvector` (đơn giản nhất: `docker compose up -d db`). Sau đó:
 ```bash
-alembic upgrade head        # tạo schema
-python seed.py               # (tuỳ chọn) tạo tài khoản/dữ liệu mẫu
+alembic upgrade head        # tạo schema (chạy được cả trên database trống)
+python seed.py               # dữ liệu mẫu; DB đã có dữ liệu thì chỉ bổ sung đơn vị/cán bộ
 uvicorn app.main:app --reload --port 8001
 ```
 API docs: http://localhost:8001/docs
 
-### Frontend
+### App Flutter
+Xem [mobile/README.md](mobile/README.md). Nhanh nhất (web):
 ```bash
-cd frontend
-npm install
-npm run dev
+cd mobile
+flutter pub get
+flutter run -d chrome --web-port 5174 --dart-define=API_BASE_URL=http://localhost:8001
 ```
-Mặc định chạy ở http://localhost:5173, gọi thẳng backend qua `VITE_API_URL` (xem `frontend/.env`).
 
-## Chạy bằng Docker Compose (dựng toàn bộ hệ thống)
+## Chạy bằng Docker Compose
 
 ```bash
 copy .env.example .env      # sửa POSTGRES_PASSWORD, SECRET_KEY... trước khi lên production
 docker compose up --build
-```
-
-- `db`: Postgres 16 + pgvector, dữ liệu lưu ở volume `pgdata`, có healthcheck (`pg_isready`).
-- `backend`: build từ Python 3.11-slim, cài `onnxruntime` (CPU). Chờ `db` khoẻ (`service_healthy`) rồi tự chạy `alembic upgrade head` trước khi khởi động `uvicorn` (xem `backend/entrypoint.sh`). Nghe ở `:8000`, evidence ảnh lưu ở volume `evidence`.
-- `frontend`: build Vite với `VITE_API_URL=/api` (cố định), phục vụ bằng nginx ở `:80` (map ra host `:5173`). nginx proxy mọi request `/api/*` sang `http://backend:8000/` (xem `frontend/nginx.conf`) để tránh CORS và không lộ địa chỉ nội bộ của backend.
-
-Truy cập frontend tại http://localhost:5173, API tại http://localhost:8000/docs (hoặc qua proxy http://localhost:5173/api/...).
-
-Sau khi lên lần đầu, tạo dữ liệu mẫu (tài khoản chạy trong container backend):
-```bash
 docker compose exec backend python seed.py
 ```
 
-## Migrations (Alembic)
+- `db` và `backend` chỉ mở cổng trên `127.0.0.1` (không lộ ra mạng LAN); người dùng truy cập qua `frontend`.
+- `frontend`: Flutter web phục vụ bằng nginx ở http://localhost:5173, proxy `/api/*` sang backend.
+- Trình duyệt chỉ cho dùng camera trên HTTPS hoặc localhost — triển khai thật cần reverse proxy HTTPS.
 
-Schema bảng được quản lý hoàn toàn bằng Alembic — không dùng `Base.metadata.create_all()` ở production nữa (chỉ `tests/conftest.py` dùng `create_all` để tạo nhanh DB test cô lập, xem mục Test).
+## Migrations (Alembic)
 
 ```bash
 cd backend
-alembic upgrade head                                   # áp dụng migration mới nhất
-alembic revision --autogenerate -m "mo ta thay doi"     # sau khi sửa app/db/models.py
-# --> luôn đọc lại file migration vừa sinh ra trước khi commit, autogenerate
-#     không phát hiện được mọi thay đổi (rename cột, thay đổi kiểu dữ liệu phức tạp...)
-alembic upgrade head                                   # áp dụng migration vừa tạo
-alembic downgrade -1                                   # rollback 1 bước nếu cần
+alembic upgrade head
+alembic revision --autogenerate -m "mo ta thay doi"     # sau khi sửa app/db/models.py, đọc lại file sinh ra
+alembic downgrade -1
 ```
+
+Migration baseline `0b5e1a7c2d90` tạo bảng gốc (trước đây tạo bằng `create_all`), bỏ qua nếu bảng đã tồn tại — nhờ đó `alembic upgrade head` chạy được trên volume mới.
 
 ## Test
 
 ```bash
-cd backend
-pytest
+cd backend && pytest          # backend (Postgres thật, DB fams_test tạo/xóa tự động)
+cd mobile && flutter test     # app Flutter
 ```
 
-`tests/conftest.py` chạy trên một database Postgres thật (`fams_test`, cùng instance Postgres của dev, xem `DATABASE_URL` trong `.env`/config test), KHÔNG dùng SQLite in-memory hay testcontainers: cột `Vector(512)` (pgvector) dùng trong `Face.embedding` không có kiểu tương đương trong SQLite nên không thể mock bằng SQLite; testcontainers được cân nhắc nhưng bị loại vì nặng hơn và phụ thuộc Docker Desktop ổn định. Schema test được tạo bằng `Base.metadata.create_all()` (nhanh, cô lập với schema Alembic của dev/prod), mỗi test chạy trong một transaction/savepoint riêng rồi rollback (`join_transaction_mode="create_savepoint"`) nên các test độc lập và không cần dọn dữ liệu thủ công.
-
-Các nhóm test chính: auth (đăng nhập đúng/sai, thu hồi token), phân quyền theo lớp (giảng viên lớp khác nhận 403), vòng đời phiên điểm danh đầy đủ (mở → xác nhận tay → đóng → tự sinh vắng cho SV chưa điểm danh), và ràng buộc `UNIQUE(session_id, student_id)` chống ghi trùng bản ghi điểm danh.
+Backend test dùng Postgres thật (cột `Vector(512)` không mock được bằng SQLite), mỗi test trong transaction riêng rồi rollback; bcrypt giảm còn 4 vòng chỉ trong test. Nhóm test chính: auth/refresh token/rate limit, phân quyền theo vai trò và phạm vi Khoa, vòng đời phiên (mở → quét/xác nhận tay → đóng/tự đóng → sinh vắng), duyệt có phép, URL ảnh có chữ ký, dữ liệu khuôn mặt của SV.
 
 ## Tài khoản mẫu (seed.py)
 
 | Email | Mật khẩu | Vai trò |
 |---|---|---|
-| admin@fams.edu.vn | admin123 | admin |
-| gv01@fams.edu.vn | gv123 | lecturer |
-| sv01@fams.edu.vn | sv123 | student |
-| sv02@fams.edu.vn | sv123 | student |
+| admin@fams.edu.vn | admin123 | Quản trị |
+| gv01@fams.edu.vn | gv123 | Giảng viên |
+| sv01@fams.edu.vn / sv02@fams.edu.vn | sv123 | Sinh viên |
+| ph01@fams.edu.vn | ph123 | Phụ huynh (của sv01) |
+| pdt01@fams.edu.vn | pdt12345 | Phòng Đào tạo |
+| ctsv01@fams.edu.vn | ctsv1234 | Phòng Công tác SV |
+| khoa.cntt@fams.edu.vn | khoa1234 | Văn phòng Khoa CNTT |
+| ban01@fams.edu.vn | ban12345 | Ban ngành (Thanh tra) |
 
 ## Ghi chú
 - Lần chạy đầu, InsightFace tự tải model `buffalo_l` (~300MB).
 - Không có GPU vẫn chạy được (ONNX Runtime CPU), ~100–200ms/frame.
+- Dữ liệu cũ chưa có Khoa: admin/P.ĐT/P.CTSV gán Khoa cho SV, GV, lớp để cán bộ Khoa thấy dữ liệu.
 - Xem `docs/FAMS-thiet-ke.md` để hiểu luồng nghiệp vụ.
-</content>
