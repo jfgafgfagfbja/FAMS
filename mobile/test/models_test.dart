@@ -71,6 +71,37 @@ void main() {
     expect(r.confirmNeeded, 2);
   });
 
+  test('Location and GPS check-in result parse', () {
+    final location = Location.fromJson({
+      'id': 2, 'code': 'CS-NUITHANH', 'name': 'Co so chinh', 'latitude': 16.0322,
+      'longitude': 108.2213, 'radius_m': 200.0, 'is_default': true,
+    });
+    expect(location.radiusM, 200.0);
+    expect(location.isDefault, isTrue);
+
+    final blocked = SelfCheckinResult.fromJson({
+      'status': 'out_of_range', 'message': 'Ban dang cach Co so chinh khoang 1200 m',
+      'distance_m': 1200.0, 'allowed_radius_m': 200.0,
+    });
+    expect(blocked.isLocationProblem, isTrue);
+    expect(blocked.distanceM, 1200.0);
+
+    final ok = SelfCheckinResult.fromJson({
+      'status': 'recognized', 'confidence': 0.9, 'record_status': 'present',
+      'distance_m': 42.0, 'allowed_radius_m': 200.0, 'message': 'Diem danh thanh cong',
+    });
+    expect(ok.isLocationProblem, isFalse);
+    expect(ok.recordStatus, 'present');
+
+    final slot = WeekSlot.fromJson({
+      'date': '2026-09-18', 'weekday': 4, 'schedule_id': 1, 'class_id': 1, 'class_code': 'A',
+      'subject_name': 'B', 'room': 'C', 'start_time': '07:00:00', 'end_time': '09:00:00',
+      'location_name': 'Co so chinh', 'location_radius_m': 200.0,
+    });
+    expect(slot.locationName, 'Co so chinh');
+    expect(slot.locationRadiusM, 200.0);
+  });
+
   test('Overview parses totals and faculty rows', () {
     final o = Overview.fromJson({
       'scope': 'school',

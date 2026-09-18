@@ -19,6 +19,12 @@ UNITS = [
     ("B-TTPC", "Ban Thanh tra - Phap che", models.UNIT_BOARD),
 ]
 
+# Dia diem diem danh: (ma, ten, vi do, kinh do, ban kinh m). Toa do GAN DUNG cua co so
+# 566 Nui Thanh - can cap nhat bang nut "Lay vi tri hien tai" tai truong truoc khi dung that.
+LOCATIONS = [
+    ("CS-NUITHANH", "Co so chinh - 566 Nui Thanh", 16.0322, 108.2213, 200.0),
+]
+
 # email, mat khau, ho ten, ma don vi, chuc vu
 STAFF = [
     ("pdt01@fams.edu.vn", "pdt12345", "Le Thi Dao Tao", "P-DT", "Chuyen vien"),
@@ -54,17 +60,29 @@ def seed_units_and_staff(db) -> list[str]:
     return created
 
 
+def seed_locations(db, make_default: bool) -> None:
+    """Tao dia diem mau neu chua co. make_default=False voi DB da co du lieu: khong tu bat
+    doi chieu GPS cho cac lich hoc dang chay khi toa do chua duoc kiem tra tai truong."""
+    for code, name, lat, lng, radius in LOCATIONS:
+        if not db.query(models.Location).filter_by(code=code).first():
+            db.add(models.Location(code=code, name=name, latitude=lat, longitude=lng,
+                                   radius_m=radius, is_default=make_default))
+    db.commit()
+
+
 def seed():
     init_db()
     db = SessionLocal()
     try:
         if db.query(models.User).first():
             created = seed_units_and_staff(db)
+            seed_locations(db, make_default=False)
             print("Da co du lieu, chi bo sung don vi/can bo."
                   + (f" Tai khoan moi: {', '.join(created)}" if created else ""))
             return
 
         created_staff = seed_units_and_staff(db)
+        seed_locations(db, make_default=True)
         cntt = db.query(models.Unit).filter_by(code="K-CNTT").first()
 
         admin = models.User(email="admin@fams.edu.vn",

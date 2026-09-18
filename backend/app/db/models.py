@@ -128,6 +128,20 @@ class Enrollment(Base):
     clazz: Mapped[Class] = relationship(back_populates="enrollments")
 
 
+class Location(Base):
+    """Dia diem diem danh (co so/toa nha) kem ban kinh cho phep khi SV tu diem danh bang GPS.
+    GPS trong nha sai so hang chuc met nen doi chieu theo khu vuc, khong theo tung phong."""
+    __tablename__ = "locations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    radius_m: Mapped[float] = mapped_column(Float, default=150.0)
+    # Ap dung cho lich hoc chua gan dia diem rieng. Toi da 1 dia diem mac dinh (api/locations.py).
+    is_default: Mapped[bool] = mapped_column(default=False)
+
+
 class Schedule(Base):
     __tablename__ = "schedules"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -136,8 +150,10 @@ class Schedule(Base):
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
     room: Mapped[str] = mapped_column(String(50))
+    location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"), nullable=True)
 
     clazz: Mapped[Class] = relationship(back_populates="schedules")
+    location: Mapped[Location | None] = relationship()
 
 
 class AttendanceSession(Base):
@@ -173,6 +189,8 @@ class AttendanceRecord(Base):
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     location_accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Khoang cach (m) tu vi tri SV toi dia diem diem danh khi tu diem danh (None neu khong doi chieu).
+    distance_m: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     session: Mapped[AttendanceSession] = relationship(back_populates="records")
     student: Mapped[Student] = relationship()

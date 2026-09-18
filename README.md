@@ -13,6 +13,7 @@ Hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện
   - Xác nhận đa khung hình: SV phải được nhận diện đủ `CONFIRM_FRAMES` lần trong phiên mới ghi điểm danh.
   - Phiên điểm danh: chỉ mở trong khung `[giờ bắt đầu − EARLY_OPEN_MINUTES, giờ kết thúc]`; sau `giờ kết thúc + SESSION_GRACE_MINUTES` không nhận điểm danh và **tự động đóng** (sinh bản ghi vắng).
   - Ảnh bằng chứng trả về dạng **URL có chữ ký HMAC** hết hạn (`MEDIA_URL_EXPIRE_MINUTES`), không còn thư mục `/evidence` công khai.
+  - **Đối chiếu GPS khi SV tự điểm danh**: mỗi lịch học gắn một địa điểm (`locations`: tọa độ + bán kính) hoặc dùng địa điểm mặc định; chặn khi thiếu vị trí, sai số GPS > `SELF_CHECKIN_MAX_ACCURACY_M`, phát hiện vị trí giả lập, hoặc ở ngoài bán kính (sai số GPS tính có lợi cho SV). Khoảng cách được lưu vào bản ghi điểm danh để đối chiếu. Chưa cấu hình địa điểm nào ⇒ không đối chiếu (`SELF_CHECKIN_REQUIRE_LOCATION`).
   - Thời gian trả về kèm múi giờ (`+07:00`). Nhật ký sửa điểm danh bắt buộc lý do (`attendance_audits`). Cảnh báo vắng (`ABSENCE_WARN_RATIO`), xuất Excel, thống kê tổng hợp theo Khoa (`GET /reports/overview`).
 - **App (Flutter — `mobile/`)**: một mã nguồn cho **Web, Android, iOS** (Dio + tự refresh token, go_router chặn route theo vai trò, camera, geolocator, fl_chart). Chi tiết: [mobile/README.md](mobile/README.md).
 - **Triển khai**: `docker-compose.yml` dựng `db` (Postgres 16 + pgvector), `backend` (`alembic upgrade head` rồi `uvicorn`), `frontend` (build Flutter web, nginx proxy `/api/` sang backend).
@@ -27,9 +28,9 @@ FAMS/
 │   ├── tests/             # pytest (Postgres thật)
 │   └── app/
 │       ├── api/           # auth, students, lecturers, classes, schedules, sessions, faces,
-│       │                  # reports, parents, units, staff, media
+│       │                  # reports, parents, units, staff, locations, media
 │       ├── core/          # config, security (JWT/refresh), authz (ma trận quyền), media (URL ký), timeutil
-│       ├── services/      # face_service, session_service (đóng/tự đóng phiên), attendance_stats…
+│       ├── services/      # face_service, session_service, geo_service (đối chiếu GPS), attendance_stats…
 │       └── schemas.py
 └── mobile/                # App Flutter (Web/Android/iOS) — giao diện duy nhất
 ```
@@ -39,6 +40,7 @@ FAMS/
 | Chức năng | Admin | P. Đào tạo | P. CTSV | Khoa | Ban ngành |
 |---|---|---|---|---|---|
 | Tài khoản cán bộ, đơn vị | Sửa | – | – | – | – |
+| Địa điểm điểm danh (tọa độ, bán kính) | Sửa | Sửa | – | – | – |
 | Lớp học phần, lịch học, ghi danh | Sửa | Sửa | Xem | Xem* | – |
 | Hồ sơ & phân công giảng viên | Sửa | Sửa | – | Xem* | – |
 | Hồ sơ sinh viên, phụ huynh | Sửa | Xem | Sửa | Xem* (SV) | – |
@@ -127,4 +129,5 @@ Backend test dùng Postgres thật (cột `Vector(512)` không mock được b�
 - Lần chạy đầu, InsightFace tự tải model `buffalo_l` (~300MB).
 - Không có GPU vẫn chạy được (ONNX Runtime CPU), ~100–200ms/frame.
 - Dữ liệu cũ chưa có Khoa: admin/P.ĐT/P.CTSV gán Khoa cho SV, GV, lớp để cán bộ Khoa thấy dữ liệu.
+- Địa điểm điểm danh mẫu (`seed.py`) dùng tọa độ **gần đúng** của cơ sở 566 Núi Thành: vào trang **Địa điểm điểm danh**, bấm "Lấy vị trí hiện tại" khi đứng tại trường rồi bật "Địa điểm mặc định" trước khi dùng thật. Trên DB đã có dữ liệu, seed KHÔNG tự bật mặc định để không chặn SV bằng tọa độ chưa kiểm chứng.
 - Xem `docs/FAMS-thiet-ke.md` để hiểu luồng nghiệp vụ.

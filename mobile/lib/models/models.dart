@@ -164,7 +164,9 @@ class ScheduleItem {
         endTime = _s(j['end_time']),
         room = _s(j['room']),
         classCode = _so(j['class_code']),
-        subjectName = _so(j['subject_name']);
+        subjectName = _so(j['subject_name']),
+        locationId = _io(j['location_id']),
+        locationName = _so(j['location_name']);
 
   final int id;
   final int classId;
@@ -174,6 +176,8 @@ class ScheduleItem {
   final String room;
   final String? classCode;
   final String? subjectName;
+  final int? locationId;
+  final String? locationName;
 }
 
 class WeekSlot {
@@ -192,7 +196,9 @@ class WeekSlot {
         openFrom = _so(j['open_from']),
         myStatus = _so(j['my_status']),
         presentCount = _io(j['present_count']),
-        totalCount = _io(j['total_count']);
+        totalCount = _io(j['total_count']),
+        locationName = _so(j['location_name']),
+        locationRadiusM = _fo(j['location_radius_m']);
 
   final DateTime date;
   final int weekday;
@@ -209,6 +215,10 @@ class WeekSlot {
   final String? myStatus;
   final int? presentCount;
   final int? totalCount;
+
+  /// Dia diem doi chieu GPS khi SV tu diem danh (null = khong doi chieu).
+  final String? locationName;
+  final double? locationRadiusM;
 }
 
 class TodaySchedule {
@@ -251,7 +261,8 @@ class SessionDetail {
         startTime = _s(j['start_time']),
         endTime = _s(j['end_time']),
         lecturerName = _so(j['lecturer_name']),
-        checkinDeadline = _dt(j['checkin_deadline']);
+        checkinDeadline = _dt(j['checkin_deadline']),
+        locationName = _so(j['location_name']);
 
   final int id;
   final int scheduleId;
@@ -267,6 +278,7 @@ class SessionDetail {
   final String endTime;
   final String? lecturerName;
   final DateTime? checkinDeadline;
+  final String? locationName;
 
   bool get isOpen => status == 'open';
 }
@@ -284,7 +296,8 @@ class RosterEntry {
         source = _so(j['source']),
         latitude = _fo(j['latitude']),
         longitude = _fo(j['longitude']),
-        locationAccuracy = _fo(j['location_accuracy']);
+        locationAccuracy = _fo(j['location_accuracy']),
+        distanceM = _fo(j['distance_m']);
 
   final int studentId;
   final String studentCode;
@@ -298,6 +311,7 @@ class RosterEntry {
   final double? latitude;
   final double? longitude;
   final double? locationAccuracy;
+  final double? distanceM;
 }
 
 class RecognizeResult {
@@ -333,7 +347,9 @@ class SelfCheckinResult {
         evidenceImage = _so(j['evidence_image']),
         recordId = _io(j['record_id']),
         recordStatus = _so(j['record_status']),
-        message = _s(j['message']);
+        message = _s(j['message']),
+        distanceM = _fo(j['distance_m']),
+        allowedRadiusM = _fo(j['allowed_radius_m']);
 
   final String status;
   final double confidence;
@@ -342,6 +358,12 @@ class SelfCheckinResult {
   final int? recordId;
   final String? recordStatus;
   final String message;
+  final double? distanceM;
+  final double? allowedRadiusM;
+
+  /// Bi chan vi vi tri (can bat dinh vi/ra gan khu vuc roi lay vi tri lai).
+  bool get isLocationProblem =>
+      const ['location_required', 'location_mocked', 'location_inaccurate', 'out_of_range'].contains(status);
 }
 
 class SessionAttendance {
@@ -356,7 +378,8 @@ class SessionAttendance {
         source = _so(j['source']),
         latitude = _fo(j['latitude']),
         longitude = _fo(j['longitude']),
-        locationAccuracy = _fo(j['location_accuracy']);
+        locationAccuracy = _fo(j['location_accuracy']),
+        distanceM = _fo(j['distance_m']);
 
   final int sessionId;
   final DateTime sessionDate;
@@ -369,6 +392,7 @@ class SessionAttendance {
   final double? latitude;
   final double? longitude;
   final double? locationAccuracy;
+  final double? distanceM;
 }
 
 class ClassAttendance {
@@ -499,6 +523,25 @@ class Unit {
   final String code;
   final String name;
   final String type;
+}
+
+class Location {
+  Location.fromJson(Json j)
+      : id = _i(j['id']),
+        code = _s(j['code']),
+        name = _s(j['name']),
+        latitude = _f(j['latitude']),
+        longitude = _f(j['longitude']),
+        radiusM = _f(j['radius_m']),
+        isDefault = _b(j['is_default']);
+
+  final int id;
+  final String code;
+  final String name;
+  final double latitude;
+  final double longitude;
+  final double radiusM;
+  final bool isDefault;
 }
 
 class StaffMember {

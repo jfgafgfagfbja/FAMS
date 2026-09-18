@@ -50,6 +50,9 @@ class Perms {
   bool get reviewFaces => manageStudents;
   bool get manageUnits => role == Roles.admin;
 
+  /// Dia diem diem danh (toa do + ban kinh doi chieu GPS) - cung nhom quan ly hoc vu.
+  bool get manageLocations => manageAcademic;
+
   /// Mo phien, quet camera, xac nhan tay, sua moi trang thai (GV chi lop minh day).
   bool get operateAttendance => _in(const [Roles.admin, Roles.lecturer]);
 

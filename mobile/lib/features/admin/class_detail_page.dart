@@ -247,6 +247,8 @@ class _StudentsTab extends StatelessWidget {
 
 Future<bool> editSchedule(BuildContext context, {required int? classId, ScheduleItem? schedule, List<ClassInfo>? classChoices}) async {
   final api = context.read<ApiClient>();
+  final locations = (await api.get('/locations') as List<dynamic>).map((e) => Location.fromJson(e as Json)).toList();
+  if (!context.mounted) return false;
   final creating = schedule == null;
   final values = await showFormDialog(
     context,
@@ -259,10 +261,22 @@ Future<bool> editSchedule(BuildContext context, {required int? classId, Schedule
       const FieldSpec('start_time', 'Giờ bắt đầu', kind: FieldKind.time),
       const FieldSpec('end_time', 'Giờ kết thúc', kind: FieldKind.time),
       const FieldSpec('room', 'Phòng'),
+      FieldSpec('location_id', 'Địa điểm điểm danh (đối chiếu GPS)', kind: FieldKind.dropdown, required: false,
+          helper: 'Để trống = dùng địa điểm mặc định',
+          options: [
+            (null, '— Địa điểm mặc định —'),
+            for (final l in locations) (l.id, '${l.name} (${l.radiusM.round()} m)'),
+          ]),
     ],
     initial: schedule == null
         ? const {'weekday': 0, 'start_time': '07:00:00', 'end_time': '09:00:00'}
-        : {'weekday': schedule.weekday, 'start_time': schedule.startTime, 'end_time': schedule.endTime, 'room': schedule.room},
+        : {
+            'weekday': schedule.weekday,
+            'start_time': schedule.startTime,
+            'end_time': schedule.endTime,
+            'room': schedule.room,
+            'location_id': schedule.locationId,
+          },
   );
   if (values == null || !context.mounted) return false;
   if ((values['start_time'] as String).compareTo(values['end_time'] as String) >= 0) {

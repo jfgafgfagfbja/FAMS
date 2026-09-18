@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/api_client.dart';
+import '../../core/formatters.dart';
 import '../../core/theme.dart';
 import '../../models/models.dart';
 import '../../widgets/camera_capture.dart';
@@ -96,6 +97,7 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
           'latitude': _position?.latitude,
           'longitude': _position?.longitude,
           'accuracy': _position?.accuracy,
+          'is_mocked': _position?.isMocked ?? false,
         },
         files: [UploadFile('frame', shot, 'selfie.jpg')],
       ) as Json;
@@ -107,10 +109,15 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
     }
   }
 
-  void _retake() => setState(() {
-        _shot = null;
-        _result = null;
-      });
+  void _retake() {
+    final relocate = _result?.isLocationProblem ?? false;
+    setState(() {
+      _shot = null;
+      _result = null;
+      if (relocate) _geoState = _GeoState.loading;
+    });
+    if (relocate) _locate();
+  }
 
   Widget _geoBanner() {
     final (icon, text, color) = switch (_geoState) {
@@ -120,7 +127,7 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
           'Đã lấy vị trí (sai số ~${_position!.accuracy.round()}m)${_position!.isMocked ? ' — cảnh báo: vị trí giả lập' : ''}',
           _position!.isMocked ? AppColors.warning : AppColors.success,
         ),
-      _GeoState.denied => (Icons.location_off, 'Không có quyền vị trí — vẫn điểm danh được nhưng không kèm vị trí', AppColors.warning),
+      _GeoState.denied => (Icons.location_off, 'Chưa cấp quyền vị trí — lớp có đối chiếu GPS sẽ không nhận điểm danh', AppColors.warning),
       _GeoState.unavailable => (Icons.location_disabled, 'Không lấy được vị trí (tắt định vị hoặc không hỗ trợ)', AppColors.warning),
     };
     return StatusChip(icon: icon, label: text, color: color);
@@ -138,6 +145,15 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
             child: Text(widget.title!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
           ),
         Align(child: _geoBanner()),
+        if (_geoState == _GeoState.denied || _geoState == _GeoState.unavailable)
+          TextButton.icon(
+            onPressed: () {
+              setState(() => _geoState = _GeoState.loading);
+              _locate();
+            },
+            icon: const Icon(Icons.my_location),
+            label: const Text('Thử lấy lại vị trí'),
+          ),
         const SizedBox(height: 12),
         if (result == null) ...[
           if (_shot != null)
@@ -197,6 +213,10 @@ class _ResultCard extends StatelessWidget {
       'already_checked' => (Icons.check_circle_outline, 'Bạn đã điểm danh buổi này', AppColors.success),
       'not_matched' => (Icons.cancel, 'Khuôn mặt không khớp', AppColors.danger),
       'spoof' => (Icons.gpp_bad, 'Ảnh nghi giả mạo', AppColors.danger),
+      'out_of_range' => (Icons.wrong_location_outlined, 'Bạn đang ở ngoài khu vực điểm danh', AppColors.danger),
+      'location_required' => (Icons.location_off, 'Cần bật định vị để điểm danh', AppColors.warning),
+      'location_inaccurate' => (Icons.gps_not_fixed, 'Vị trí chưa đủ chính xác', AppColors.warning),
+      'location_mocked' => (Icons.gpp_bad, 'Phát hiện vị trí giả lập', AppColors.danger),
       _ => (Icons.warning_amber_rounded, 'Chưa nhận diện được', AppColors.warning),
     };
     return SectionCard(
@@ -214,11 +234,18 @@ class _ResultCard extends StatelessWidget {
             Text(result.message, textAlign: TextAlign.center),
           ],
           if (result.confidence > 0) Text('Độ khớp: ${result.confidence.toStringAsFixed(2)}'),
+          if (result.distanceM != null)
+            Text('Khoảng cách tới địa điểm: ${distanceLabel(result.distanceM)}'
+                '${result.allowedRadiusM != null ? ' (cho phép ${distanceLabel(result.allowedRadiusM)})' : ''}'),
           const SizedBox(height: 16),
           Wrap(
             spacing: 12,
             children: [
-              if (!success) FilledButton(onPressed: onRetry, child: const Text('Thử lại')),
+              if (!success)
+                FilledButton(
+                  onPressed: onRetry,
+                  child: Text(result.isLocationProblem ? 'Lấy lại vị trí và thử lại' : 'Thử lại'),
+                ),
               OutlinedButton(onPressed: () => context.go('/schedule'), child: const Text('Về lịch học')),
             ],
           ),

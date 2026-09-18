@@ -12,6 +12,7 @@ from app.db import models
 from app.db.database import get_db
 from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT,
                            ROLE_TRAINING)
+from app.services.geo_service import default_location
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
@@ -54,6 +55,7 @@ def list_all_schedules(
             id=s.id, class_id=s.class_id, class_code=s.clazz.class_code,
             subject_name=s.clazz.subject_name, weekday=s.weekday,
             start_time=s.start_time, end_time=s.end_time, room=s.room,
+            location_id=s.location_id, location_name=s.location.name if s.location else None,
         )
         for s in query.all()
     ]
@@ -139,6 +141,7 @@ def week_schedule(
         )
         total_count_by_class = dict(rows)
 
+    fallback_location = default_location(db)
     result = []
     for d in week_dates:
         weekday = d.weekday()
@@ -155,6 +158,10 @@ def week_schedule(
                 session_id=session.id if session else None,
                 session_status=session.status if session else None,
             )
+            location = sch.location or fallback_location
+            if location is not None:
+                entry.location_name = location.name
+                entry.location_radius_m = location.radius_m
             if session:
                 entry.my_status = my_status_by_session.get(session.id)
                 if session.status == "closed" and user.role != ROLE_STUDENT:

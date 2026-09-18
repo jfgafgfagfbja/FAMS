@@ -22,6 +22,13 @@ void main() {
     expect(mondayOf(DateTime(2026, 9, 14)), DateTime(2026, 9, 14));
   });
 
+  test('distanceLabel switches to km', () {
+    expect(distanceLabel(null), '');
+    expect(distanceLabel(35.4), '35 m');
+    expect(distanceLabel(999), '999 m');
+    expect(distanceLabel(1250), '1,3 km');
+  });
+
   test('labels', () {
     expect(attendanceStatusLabel('excused'), 'Có phép');
     expect(attendanceStatusLabel(null), 'Chưa điểm danh');

@@ -59,6 +59,7 @@ class SessionRecordsPage extends StatelessWidget {
               children: [
                 InfoLine(icon: Icons.event, text: '${weekdayLabel(session.sessionDate.weekday - 1)} ${fmtDate(session.sessionDate)} · ${hhmm(session.startTime)}–${hhmm(session.endTime)}'),
                 InfoLine(icon: Icons.meeting_room_outlined, text: 'Phòng ${session.room}'),
+                if (session.locationName != null) InfoLine(icon: Icons.place_outlined, text: session.locationName!),
                 if (session.lecturerName != null) InfoLine(icon: Icons.person_outline, text: session.lecturerName!),
                 StatusChip(label: session.isOpen ? 'Đang mở' : 'Đã đóng', color: statusColor(session.isOpen ? 'open' : null)),
               ],
@@ -178,6 +179,7 @@ class _RecordTile extends StatelessWidget {
       if (entry.source != null && entry.status != 'absent') sourceLabel(entry.source),
       if (entry.checkedAt != null && entry.status != 'absent') fmtTime(entry.checkedAt),
       if (entry.confidence != null && entry.confidence! > 0) 'khớp ${entry.confidence!.toStringAsFixed(2)}',
+      if (entry.distanceM != null) 'cách ${distanceLabel(entry.distanceM)}',
     ];
     final hasRecord = entry.recordId != null;
     return ListTile(

@@ -173,6 +173,55 @@ class ClassOut(BaseModel):
     student_count: int | None = None
 
 
+# ---- Dia diem diem danh ----
+class LocationCreate(BaseModel):
+    code: str
+    name: str
+    latitude: float
+    longitude: float
+    radius_m: float = 150.0
+    is_default: bool = False
+
+    @model_validator(mode="after")
+    def _valid_coordinates(self):
+        if not -90 <= self.latitude <= 90 or not -180 <= self.longitude <= 180:
+            raise ValueError("Toa do khong hop le")
+        if not 10 <= self.radius_m <= 5000:
+            raise ValueError("Ban kinh phai tu 10 den 5000 m")
+        return self
+
+
+class LocationUpdate(BaseModel):
+    code: str | None = None
+    name: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    radius_m: float | None = None
+    is_default: bool | None = None
+
+    @model_validator(mode="after")
+    def _valid_coordinates(self):
+        if self.latitude is not None and not -90 <= self.latitude <= 90:
+            raise ValueError("Vi do khong hop le")
+        if self.longitude is not None and not -180 <= self.longitude <= 180:
+            raise ValueError("Kinh do khong hop le")
+        if self.radius_m is not None and not 10 <= self.radius_m <= 5000:
+            raise ValueError("Ban kinh phai tu 10 den 5000 m")
+        return self
+
+
+class LocationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    latitude: float
+    longitude: float
+    radius_m: float
+    is_default: bool
+
+
 def _check_weekday(v: int | None) -> int | None:
     if v is not None and not 0 <= v <= 6:
         raise ValueError("Thu trong tuan phai tu 0 (Thu 2) den 6 (Chu nhat)")
@@ -185,6 +234,7 @@ class ScheduleCreate(BaseModel):
     start_time: time
     end_time: time
     room: str
+    location_id: int | None = None
 
     @field_validator("weekday")
     @classmethod
@@ -203,6 +253,7 @@ class ScheduleUpdate(BaseModel):
     start_time: time | None = None
     end_time: time | None = None
     room: str | None = None
+    location_id: int | None = None
 
     @field_validator("weekday")
     @classmethod
@@ -219,6 +270,7 @@ class ScheduleOut(BaseModel):
     start_time: time
     end_time: time
     room: str
+    location_id: int | None = None
 
 
 # ---- Lecturer ----
@@ -280,6 +332,7 @@ class SessionDetail(BaseModel):
     lecturer_name: str | None = None
     # Het thoi diem nay (end_time + SESSION_GRACE_MINUTES) khong nhan diem danh nua.
     checkin_deadline: LocalDateTime | None = None
+    location_name: str | None = None  # dia diem doi chieu GPS khi SV tu diem danh
 
 
 class RecognizeResult(BaseModel):
@@ -306,6 +359,8 @@ class SelfCheckinResult(BaseModel):
     record_id: int | None = None
     record_status: str | None = None  # present | late (khi status=recognized/already_checked)
     message: str = ""
+    distance_m: float | None = None       # khoang cach toi dia diem diem danh (neu doi chieu GPS)
+    allowed_radius_m: float | None = None
 
 
 class RecordOut(BaseModel):
@@ -321,6 +376,7 @@ class RecordOut(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     location_accuracy: float | None = None
+    distance_m: float | None = None
 
 
 class RecordUpdate(BaseModel):
@@ -360,6 +416,7 @@ class RosterEntryOut(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     location_accuracy: float | None = None
+    distance_m: float | None = None
 
 
 class TodayScheduleOut(BaseModel):
@@ -393,6 +450,7 @@ class MyAttendanceSessionOut(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     location_accuracy: float | None = None
+    distance_m: float | None = None
 
 
 class MyClassAttendanceOut(BaseModel):
@@ -425,6 +483,8 @@ class ScheduleWithClassOut(BaseModel):
     start_time: time
     end_time: time
     room: str
+    location_id: int | None = None
+    location_name: str | None = None
 
 
 class WeekSlotOut(BaseModel):
@@ -447,6 +507,9 @@ class WeekSlotOut(BaseModel):
     my_status: str | None = None  # SV: trang thai diem danh cua chinh minh (neu co)
     present_count: int | None = None  # GV: so SV co mat khi phien da dong
     total_count: int | None = None  # GV: tong so SV ghi danh lop
+    # Dia diem doi chieu GPS khi SV tu diem danh (rieng cua lich hoc hoac mac dinh cua truong).
+    location_name: str | None = None
+    location_radius_m: float | None = None
 
 
 # ---- Me ----

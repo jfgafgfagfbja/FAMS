@@ -58,6 +58,13 @@ String attendanceStatusLabel(String? status) => switch (status) {
       _ => status,
     };
 
+/// 35.4 -> "35 m", 1250 -> "1,3 km".
+String distanceLabel(double? meters) {
+  if (meters == null) return '';
+  if (meters < 1000) return '${meters.round()} m';
+  return '${(meters / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
+}
+
 String sourceLabel(String? source) => switch (source) {
       'camera' => 'Camera lớp học',
       'selfie' => 'SV tự chụp',

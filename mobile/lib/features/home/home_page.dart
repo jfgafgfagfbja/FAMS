@@ -11,6 +11,7 @@ import '../../models/models.dart';
 import '../../widgets/common.dart';
 import '../office/overview_page.dart';
 import '../parent/children_page.dart';
+import '../schedule/week_schedule_page.dart' show selfCheckinTitle;
 
 /// Trang chu theo vai tro.
 class HomePage extends StatelessWidget {
@@ -110,7 +111,7 @@ class _StudentHome extends StatelessWidget {
                                 : slot.sessionStatus == 'open'
                                     ? FilledButton.icon(
                                         onPressed: () => context.push('/self-checkin/${slot.sessionId}',
-                                            extra: '${slot.classCode} — ${slot.subjectName} · Phòng ${slot.room}'),
+                                            extra: selfCheckinTitle(slot)),
                                         icon: const Icon(Icons.camera_alt_outlined),
                                         label: const Text('Tự điểm danh'),
                                       )

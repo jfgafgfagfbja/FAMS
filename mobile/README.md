@@ -21,7 +21,7 @@ lib/
     ├── parent/    # con em, chuyên cần của con
     ├── lecturer/  # phiên điểm danh, quét camera cả lớp, kết quả phiên, báo cáo + Excel
     ├── office/    # thống kê tổng hợp (P.ĐT, P.CTSV, Khoa, Ban ngành)
-    └── admin/     # SV, GV, lớp HP, lịch, duyệt khuôn mặt, phụ huynh, đơn vị, cán bộ
+    └── admin/     # SV, GV, lớp HP, lịch, địa điểm điểm danh, duyệt khuôn mặt, phụ huynh, đơn vị, cán bộ
 ```
 
 ## Chạy khi phát triển
@@ -61,4 +61,5 @@ flutter build apk --release
 
 - Trình duyệt chỉ cho dùng camera trên **HTTPS hoặc localhost**. Triển khai web thật cần reverse proxy HTTPS.
 - Ảnh bằng chứng là URL có chữ ký, hết hạn sau `MEDIA_URL_EXPIRE_MINUTES` — kéo để tải lại trang nếu ảnh không hiện.
+- Tự điểm danh cần quyền vị trí: lớp có gắn địa điểm sẽ bị chặn nếu ở ngoài bán kính hoặc GPS sai số lớn.
 - Màn quét cả lớp: nếu khung mặt bị lệch trái/phải (tùy thiết bị camera trước), bật/tắt **Lật khung**.

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app import schemas
 from app.core.authz import (CLASS_VIEWERS, can_excuse_record, ensure_class_access,
@@ -15,6 +15,7 @@ from app.db import models
 from app.db.database import get_db
 from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT)
 from app.services import face_service
+from app.services.geo_service import check_checkin_location, resolve_location
 from app.services.session_service import (_confirm_counts, checkin_deadline,
                                           close_session as close_session_records,
                                           ensure_accepting_checkins)
@@ -43,6 +44,7 @@ def _get_session_or_404(db: Session, session_id: int) -> models.AttendanceSessio
 
 def _session_detail(session: models.AttendanceSession) -> schemas.SessionDetail:
     clazz = session.schedule.clazz
+    location = resolve_location(object_session(session), session.schedule)
     return schemas.SessionDetail(
         id=session.id, schedule_id=session.schedule_id,
         session_date=session.session_date, status=session.status,
@@ -52,6 +54,7 @@ def _session_detail(session: models.AttendanceSession) -> schemas.SessionDetail:
         end_time=session.schedule.end_time,
         lecturer_name=clazz.lecturer.user.full_name if clazz.lecturer else None,
         checkin_deadline=checkin_deadline(session),
+        location_name=location.name if location else None,
     )
 
 
@@ -187,6 +190,7 @@ def session_roster(
             latitude=r.latitude if r else None,
             longitude=r.longitude if r else None,
             location_accuracy=r.location_accuracy if r else None,
+            distance_m=r.distance_m if r else None,
         ))
     return result
 
@@ -339,13 +343,15 @@ async def self_checkin(
     latitude: float | None = Form(None),
     longitude: float | None = Form(None),
     accuracy: float | None = Form(None),
+    is_mocked: bool = Form(False),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_roles(ROLE_STUDENT)),
 ):
     """SV tu chup selfie de diem danh (khac luong GV quet camera ca lop o
     /recognize): chi nhan dien so voi khuon mat cua CHINH SV dang dang nhap
-    (recognize_self), kem toa do GPS (neu SV cho phep) de lam bang chung thoi gian +
-    dia diem diem danh. Chi nhan truoc han checkin_deadline cua phien."""
+    (recognize_self). Toa do GPS phai nam trong ban kinh dia diem cua lich hoc (hoac dia
+    diem mac dinh) - doi chieu TRUOC khi nhan dien de khong ton tai nguyen. Chi nhan truoc
+    han checkin_deadline cua phien."""
     session = _get_session_or_404(db, session_id)
     ensure_accepting_checkins(session)
 
@@ -372,6 +378,13 @@ async def self_checkin(
             status="already_checked", record_id=existed.id, record_status=existed.status,
             evidence_image=existed.evidence_image or None, confidence=existed.confidence,
             message="Ban da diem danh phien nay roi")
+
+    location_check = check_checkin_location(
+        resolve_location(db, session.schedule), latitude, longitude, accuracy, is_mocked)
+    if not location_check.ok:
+        return schemas.SelfCheckinResult(
+            status=location_check.status, message=location_check.message,
+            distance_m=location_check.distance_m, allowed_radius_m=location_check.allowed_radius_m)
 
     data = await frame.read()
     result = face_service.recognize_self(db, data, student.id)
@@ -401,6 +414,7 @@ async def self_checkin(
         status="late" if _is_late(session) else "present",
         confidence=result["confidence"], evidence_image=evidence_path,
         source="selfie", latitude=latitude, longitude=longitude, location_accuracy=accuracy,
+        distance_m=location_check.distance_m,
     )
     db.add(record)
     try:
@@ -424,6 +438,7 @@ async def self_checkin(
         liveness_score=result["liveness_score"], evidence_image=evidence_path,
         record_id=record.id, record_status=record.status,
         message="Diem danh thanh cong",
+        distance_m=location_check.distance_m, allowed_radius_m=location_check.allowed_radius_m,
     )
 
 

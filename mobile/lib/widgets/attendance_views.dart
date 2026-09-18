@@ -135,6 +135,7 @@ class _SessionRow extends StatelessWidget {
       if (session.checkedAt != null && session.status != 'absent') 'Ghi nhận ${fmtTime(session.checkedAt)}',
       if (session.source != null && session.status != 'absent') sourceLabel(session.source),
       if (session.confidence != null && session.confidence! > 0) 'Độ khớp ${session.confidence!.toStringAsFixed(2)}',
+      if (session.distanceM != null) 'Cách địa điểm ${distanceLabel(session.distanceM)}',
     ];
     return ListTile(
       leading: EvidenceImage(path: session.evidenceImage, size: 44),

@@ -7,6 +7,7 @@ import 'features/admin/class_detail_page.dart';
 import 'features/admin/classes_page.dart';
 import 'features/admin/face_review_page.dart';
 import 'features/admin/lecturers_page.dart';
+import 'features/admin/locations_page.dart';
 import 'features/admin/parents_page.dart';
 import 'features/admin/schedules_page.dart';
 import 'features/admin/staff_page.dart';
@@ -52,6 +53,7 @@ const _routeRoles = <String, List<String>>{
   '/face-review': [Roles.admin, Roles.affairs],
   '/parents': [Roles.admin, Roles.affairs, Roles.training],
   '/enroll-face': [Roles.admin, Roles.affairs, Roles.lecturer],
+  '/locations': [Roles.admin, Roles.training],
   '/units': [Roles.admin],
   '/staff': [Roles.admin],
 };
@@ -148,6 +150,7 @@ GoRouter buildRouter(AuthController auth) {
           GoRoute(path: '/class-schedules', builder: (context, state) => const SchedulesPage()),
           GoRoute(path: '/face-review', builder: (context, state) => const FaceReviewPage()),
           GoRoute(path: '/parents', builder: (context, state) => const ParentsPage()),
+          GoRoute(path: '/locations', builder: (context, state) => const LocationsPage()),
           GoRoute(path: '/units', builder: (context, state) => const UnitsPage()),
           GoRoute(path: '/staff', builder: (context, state) => const StaffPage()),
         ],

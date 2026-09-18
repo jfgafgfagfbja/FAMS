@@ -147,6 +147,14 @@ class _WeekSchedulePageState extends State<WeekSchedulePage> {
   }
 }
 
+/// Tieu de man tu diem danh: lop, phong va khu vuc GPS phai dung trong.
+String selfCheckinTitle(WeekSlot slot) {
+  final area = slot.locationName == null
+      ? ''
+      : '\nĐiểm danh trong phạm vi ${distanceLabel(slot.locationRadiusM)} quanh ${slot.locationName}';
+  return '${slot.classCode} — ${slot.subjectName} · Phòng ${slot.room}$area';
+}
+
 class _SlotTile extends StatelessWidget {
   const _SlotTile({
     required this.slot,
@@ -167,7 +175,7 @@ class _SlotTile extends StatelessWidget {
       if (slot.myStatus != null) return StatusChip.attendance(slot.myStatus);
       if (isToday && slot.sessionStatus == 'open') {
         return FilledButton.icon(
-          onPressed: () => context.push('/self-checkin/${slot.sessionId}', extra: '${slot.classCode} — ${slot.subjectName} · Phòng ${slot.room}'),
+          onPressed: () => context.push('/self-checkin/${slot.sessionId}', extra: selfCheckinTitle(slot)),
           icon: const Icon(Icons.camera_alt_outlined),
           label: const Text('Tự điểm danh'),
         );
@@ -212,7 +220,7 @@ class _SlotTile extends StatelessWidget {
         ),
       ),
       title: Text('${slot.classCode} — ${slot.subjectName}'),
-      subtitle: Text('Phòng ${slot.room}'),
+      subtitle: Text(['Phòng ${slot.room}', ?slot.locationName].join(' · ')),
       trailing: _trailing(context),
     );
   }

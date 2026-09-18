@@ -32,6 +32,11 @@ def _ensure_class_code_available(db: Session, class_code: str, exclude_id: int |
         raise HTTPException(400, "Ma lop hoc phan da ton tai")
 
 
+def _validate_location(db: Session, location_id: int | None) -> None:
+    if location_id is not None and not db.get(models.Location, location_id):
+        raise HTTPException(400, "Dia diem khong ton tai")
+
+
 def _student_counts(db: Session, class_ids: list[int]) -> dict[int, int]:
     if not class_ids:
         return {}
@@ -210,6 +215,7 @@ def create_schedule(
     _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
 ):
     _get_class_or_404(db, body.class_id)
+    _validate_location(db, body.location_id)
     sched = models.Schedule(**body.model_dump())
     db.add(sched)
     db.commit()
@@ -228,6 +234,8 @@ def update_schedule(
     if not sched:
         raise HTTPException(404, "Lich hoc khong ton tai")
     data = body.model_dump(exclude_unset=True)
+    if "location_id" in data:
+        _validate_location(db, data["location_id"])
     start = data.get("start_time", sched.start_time)
     end = data.get("end_time", sched.end_time)
     if start is None or end is None or start >= end:

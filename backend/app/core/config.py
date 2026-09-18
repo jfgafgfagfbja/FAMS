@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     ANTISPOOF_THRESHOLD: float = 0.5      # diem "that" toi thieu de coi la mat that
     ANTISPOOF_MODEL_PATH: str = "./models/2.7_80x80_MiniFASNetV2.onnx"
     CONFIRM_FRAMES: int = 2                # so frame can nhan dien du de ghi attendance record
+    # SV tu diem danh (selfie) phai o trong ban kinh dia diem cua lich hoc (hoac dia diem mac
+    # dinh). Chua cau hinh dia diem nao -> bo qua doi chieu. GPS do app gui len nen van co the bi
+    # gia mao - day la lop kiem tra bo sung, khong thay the xac nhan cua giang vien.
+    SELF_CHECKIN_REQUIRE_LOCATION: bool = True
+    SELF_CHECKIN_MAX_ACCURACY_M: float = 100.0  # sai so GPS lon hon muc nay -> yeu cau thu lai
     ABSENCE_WARN_RATIO: float = 0.2        # ti le vang (khong tinh excused) -> canh bao cam thi
 
     # Mui gio cua moi gia tri datetime luu trong DB (naive, gio dia phuong) - dung de

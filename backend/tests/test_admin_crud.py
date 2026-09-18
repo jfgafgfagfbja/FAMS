@@ -153,7 +153,9 @@ def test_delete_lecturer_succeeds_when_no_class(client, seed):
 def test_update_schedule(client, seed):
     token = _admin(client)
     resp = client.patch(f"/classes/schedules/{seed['schedule2_id']}",
-                        json={"room": "P999", "start_time": "08:00:00"},
+                        # Dat ca gio ket thuc: lich seed ket thuc "bay gio + 3h", chay test sau
+                        # nua dem thi 08:00 se sau gio ket thuc va bi tu choi (start < end).
+                        json={"room": "P999", "start_time": "08:00:00", "end_time": "10:00:00"},
                         headers=auth_headers(token))
     assert resp.status_code == 200
     assert resp.json()["room"] == "P999"

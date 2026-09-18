@@ -152,6 +152,7 @@ def compute_student_attendance(
                 latitude=r.latitude if r else None,
                 longitude=r.longitude if r else None,
                 location_accuracy=r.location_accuracy if r else None,
+                distance_m=r.distance_m if r else None,
             ))
 
         total_sessions = len(sessions)
