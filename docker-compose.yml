@@ -43,6 +43,8 @@ services:
       - "127.0.0.1:8000:8000"
     volumes:
       - evidence:/app/evidence
+      # Model nhan dien (~300MB) tai ve lan dau; giu lai de khoi tai lai moi lan dung lai.
+      - insightface:/root/.insightface
     depends_on:
       db:
         condition: service_healthy
@@ -64,3 +66,4 @@ services:
 volumes:
   pgdata:
   evidence:
+  insightface:
