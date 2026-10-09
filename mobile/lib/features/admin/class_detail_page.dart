@@ -247,9 +247,17 @@ class _StudentsTab extends StatelessWidget {
 
 Future<bool> editSchedule(BuildContext context, {required int? classId, ScheduleItem? schedule, List<ClassInfo>? classChoices}) async {
   final api = context.read<ApiClient>();
-  final locations = (await api.get('/locations') as List<dynamic>).map((e) => Location.fromJson(e as Json)).toList();
+  final loaded = await Future.wait([api.get('/locations'), api.get('/rooms')]);
+  final locations = (loaded[0] as List<dynamic>).map((e) => Location.fromJson(e as Json)).toList();
+  final rooms = (loaded[1] as List<dynamic>).map((e) => Room.fromJson(e as Json)).toList();
   if (!context.mounted) return false;
   final creating = schedule == null;
+  // Danh muc phong trong (truong moi dung he thong) thi van cho go ten phong bang tay.
+  final roomField = rooms.isEmpty
+      ? const FieldSpec('room', 'Phòng', helper: 'Thêm phòng ở mục "Phòng học" để chọn từ danh sách')
+      : FieldSpec('room_id', 'Phòng học', kind: FieldKind.dropdown,
+          helper: 'Vị trí đối chiếu GPS lấy theo phòng',
+          options: [for (final r in rooms) (r.id, '${r.name}${r.capacity != null ? ' · ${r.capacity} chỗ' : ''}')]);
   final values = await showFormDialog(
     context,
     title: creating ? 'Thêm lịch học' : 'Sửa lịch học',
@@ -260,11 +268,11 @@ Future<bool> editSchedule(BuildContext context, {required int? classId, Schedule
       FieldSpec('weekday', 'Thứ', kind: FieldKind.dropdown, options: [for (var i = 0; i < 7; i++) (i, weekdayLabel(i))]),
       const FieldSpec('start_time', 'Giờ bắt đầu', kind: FieldKind.time),
       const FieldSpec('end_time', 'Giờ kết thúc', kind: FieldKind.time),
-      const FieldSpec('room', 'Phòng'),
+      roomField,
       FieldSpec('location_id', 'Địa điểm điểm danh (đối chiếu GPS)', kind: FieldKind.dropdown, required: false,
-          helper: 'Để trống = dùng địa điểm mặc định',
+          helper: 'Để trống = theo khu vực của phòng, không có thì dùng địa điểm mặc định',
           options: [
-            (null, '— Địa điểm mặc định —'),
+            (null, '— Theo phòng học —'),
             for (final l in locations) (l.id, '${l.name} (${l.radiusM.round()} m)'),
           ]),
     ],
@@ -274,7 +282,7 @@ Future<bool> editSchedule(BuildContext context, {required int? classId, Schedule
             'weekday': schedule.weekday,
             'start_time': schedule.startTime,
             'end_time': schedule.endTime,
-            'room': schedule.room,
+            if (rooms.isEmpty) 'room': schedule.room else 'room_id': schedule.roomId,
             'location_id': schedule.locationId,
           },
   );
@@ -328,7 +336,7 @@ class _SchedulesTab extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.schedule),
                     title: Text('${weekdayLabel(s.weekday)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)}'),
-                    subtitle: Text('Phòng ${s.room}'),
+                    subtitle: Text(roomLabel(s.room)),
                     trailing: perms.manageAcademic
                         ? Wrap(children: [
                             IconButton(

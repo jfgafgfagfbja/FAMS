@@ -11,6 +11,7 @@ from app.core.security import hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
 from app.db.models import ROLE_ADMIN, ROLE_AFFAIRS, ROLE_PARENT, ROLE_TRAINING
+from app.services import email_service
 
 router = APIRouter(prefix="/parents", tags=["parents"])
 
@@ -141,6 +142,34 @@ def delete_parent(
 # QUAN TRONG: cac route "/me/..." phai khai bao TRUOC "/{parent_id}/..." o duoi -
 # FastAPI khop route theo THU TU khai bao, neu de "/{parent_id}/children" truoc
 # thi "/me/children" se bi no "nuot" nham (hieu parent_id="me") va tra ve 422.
+@router.get("/me/preferences", response_model=schemas.ParentPreferencesOut)
+def my_preferences(
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(ROLE_PARENT)),
+):
+    parent = _get_parent_by_user(db, user)
+    return schemas.ParentPreferencesOut(
+        notify_email=parent.notify_email, notify_present=parent.notify_present,
+        email_available=email_service.is_configured())
+
+
+@router.patch("/me/preferences", response_model=schemas.ParentPreferencesOut)
+def update_my_preferences(
+    body: schemas.ParentPreferencesUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(ROLE_PARENT)),
+):
+    """Phu huynh tu bat/tat email thong bao, va tin bao khi con co mat."""
+    parent = _get_parent_by_user(db, user)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if value is not None:
+            setattr(parent, field, value)
+    db.commit()
+    return schemas.ParentPreferencesOut(
+        notify_email=parent.notify_email, notify_present=parent.notify_present,
+        email_available=email_service.is_configured())
+
+
 @router.get("/me/children", response_model=list[schemas.ParentChildOut])
 def my_children(
     db: Session = Depends(get_db),

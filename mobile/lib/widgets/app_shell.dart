@@ -30,6 +30,7 @@ List<NavItem> navItemsFor(String role) {
     case Roles.parent:
       return const [
         NavItem('/', 'Con em', Icons.family_restroom_outlined),
+        NavItem('/notifications', 'Thông báo', Icons.notifications_outlined),
         NavItem('/account', 'Tài khoản', Icons.person_outline),
       ];
     case Roles.lecturer:
@@ -49,6 +50,7 @@ List<NavItem> navItemsFor(String role) {
         NavItem('/classes', 'Lớp học phần', Icons.class_outlined),
         NavItem('/class-schedules', 'Lịch học', Icons.calendar_month_outlined),
         NavItem('/locations', 'Địa điểm điểm danh', Icons.place_outlined),
+        NavItem('/rooms', 'Phòng học', Icons.meeting_room_outlined),
         NavItem('/sessions', 'Phiên điểm danh', Icons.how_to_reg_outlined),
         NavItem('/reports', 'Báo cáo', Icons.bar_chart_outlined),
         NavItem('/face-review', 'Duyệt khuôn mặt', Icons.face_outlined),
@@ -63,6 +65,7 @@ List<NavItem> navItemsFor(String role) {
         NavItem('/classes', 'Lớp học phần', Icons.class_outlined),
         NavItem('/class-schedules', 'Lịch học', Icons.calendar_month_outlined),
         NavItem('/locations', 'Địa điểm điểm danh', Icons.place_outlined),
+        NavItem('/rooms', 'Phòng học', Icons.meeting_room_outlined),
         NavItem('/lecturers', 'Giảng viên', Icons.co_present_outlined),
         NavItem('/students', 'Sinh viên', Icons.school_outlined),
         NavItem('/sessions', 'Phiên điểm danh', Icons.how_to_reg_outlined),

@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, object_session
 
 from app import schemas
+from app.api.serializers import room_label
 from app.core.authz import (CLASS_VIEWERS, can_excuse_record, ensure_class_access,
                             ensure_class_view, filter_classes)
 from app.core.config import settings
@@ -14,8 +15,8 @@ from app.core.security import require_roles
 from app.db import models
 from app.db.database import get_db
 from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT)
-from app.services import face_service
-from app.services.geo_service import check_checkin_location, resolve_location
+from app.services import checkin_code_service, face_service
+from app.services.geo_service import check_checkin_location, resolve_geofence
 from app.services.session_service import (_confirm_counts, checkin_deadline,
                                           close_session as close_session_records,
                                           ensure_accepting_checkins)
@@ -44,17 +45,18 @@ def _get_session_or_404(db: Session, session_id: int) -> models.AttendanceSessio
 
 def _session_detail(session: models.AttendanceSession) -> schemas.SessionDetail:
     clazz = session.schedule.clazz
-    location = resolve_location(object_session(session), session.schedule)
+    fence = resolve_geofence(object_session(session), session.schedule)
     return schemas.SessionDetail(
         id=session.id, schedule_id=session.schedule_id,
         session_date=session.session_date, status=session.status,
         opened_at=session.opened_at, closed_at=session.closed_at,
         class_id=clazz.id, class_code=clazz.class_code, subject_name=clazz.subject_name,
-        room=session.schedule.room, start_time=session.schedule.start_time,
+        room=room_label(session.schedule), start_time=session.schedule.start_time,
         end_time=session.schedule.end_time,
         lecturer_name=clazz.lecturer.user.full_name if clazz.lecturer else None,
         checkin_deadline=checkin_deadline(session),
-        location_name=location.name if location else None,
+        location_name=fence.name if fence else None,
+        require_qr=session.require_qr,
     )
 
 
@@ -100,7 +102,9 @@ def open_session(
         raise HTTPException(400, "Da co phien diem danh cho lich hoc nay trong ngay hom nay")
 
     session = models.AttendanceSession(
-        schedule_id=body.schedule_id, session_date=body.session_date
+        schedule_id=body.schedule_id, session_date=body.session_date,
+        require_qr=(settings.SELF_CHECKIN_REQUIRE_QR_DEFAULT if body.require_qr is None
+                    else body.require_qr),
     )
     db.add(session)
     try:
@@ -150,6 +154,61 @@ def get_session(
     session = _get_session_or_404(db, session_id)
     ensure_class_view(user, session.schedule.class_id, db)
     return _session_detail(session)
+
+
+@router.patch("/{session_id}", response_model=schemas.SessionDetail)
+def update_session(
+    session_id: int,
+    body: schemas.SessionUpdate,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(ROLE_LECTURER, ROLE_ADMIN)),
+):
+    """Bat/tat yeu cau quet ma QR cho buoi dang dien ra."""
+    session = _get_session_or_404(db, session_id)
+    ensure_class_access(user, session.schedule.class_id, db)
+    if session.status != "open":
+        raise HTTPException(400, "Phien da dong, khong sua duoc")
+    session.require_qr = body.require_qr
+    db.commit()
+    db.refresh(session)
+    return _session_detail(session)
+
+
+@router.get("/{session_id}/checkin-info", response_model=schemas.CheckinInfoOut)
+def checkin_info(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(ROLE_STUDENT)),
+):
+    """SV xem buoi nay co bat buoc quet ma QR khong, truoc khi chup anh."""
+    session = _get_session_or_404(db, session_id)
+    student = db.query(models.Student).filter_by(user_id=user.id).first()
+    if not student or not db.query(models.Enrollment).filter_by(
+            class_id=session.schedule.class_id, student_id=student.id).first():
+        raise HTTPException(403, "Ban khong ghi danh lop hoc phan nay")
+    return schemas.CheckinInfoOut(session_id=session.id, require_qr=session.require_qr,
+                                  room=room_label(session.schedule))
+
+
+@router.get("/{session_id}/checkin-code", response_model=schemas.CheckinCodeOut)
+def session_checkin_code(
+    session_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(require_roles(*CLASS_VIEWERS)),
+):
+    """Ma QR dang hieu luc cua phien, de giang vien chieu len man hinh trong phong.
+
+    Chi nguoi day/quan ly lop xem duoc - sinh vien goi API nay se la cach lay ma ma
+    khong can co mat trong phong, dung het y nghia cua viec quet ma.
+    """
+    session = _get_session_or_404(db, session_id)
+    ensure_class_access(user, session.schedule.class_id, db)
+    if session.status != "open":
+        raise HTTPException(400, "Phien da dong, khong con ma diem danh")
+    code = checkin_code_service.current_code(session.id)
+    return schemas.CheckinCodeOut(
+        session_id=session.id, qr_payload=code.qr_payload, digits=code.digits,
+        rotate_seconds=code.rotate_seconds, expires_in_seconds=code.expires_in_seconds)
 
 
 @router.get("/{session_id}/roster", response_model=list[schemas.RosterEntryOut])
@@ -344,6 +403,7 @@ async def self_checkin(
     longitude: float | None = Form(None),
     accuracy: float | None = Form(None),
     is_mocked: bool = Form(False),
+    checkin_code: str | None = Form(None),
     db: Session = Depends(get_db),
     user: models.User = Depends(require_roles(ROLE_STUDENT)),
 ):
@@ -379,8 +439,15 @@ async def self_checkin(
             evidence_image=existed.evidence_image or None, confidence=existed.confidence,
             message="Ban da diem danh phien nay roi")
 
+    if session.require_qr and not checkin_code_service.verify(session.id, checkin_code):
+        return schemas.SelfCheckinResult(
+            status="qr_required" if not checkin_code else "qr_invalid",
+            message=("Buoi nay yeu cau quet ma QR dang chieu trong phong"
+                     if not checkin_code
+                     else "Ma QR da het han hoac khong dung buoi nay, hay quet lai ma moi nhat"))
+
     location_check = check_checkin_location(
-        resolve_location(db, session.schedule), latitude, longitude, accuracy, is_mocked)
+        resolve_geofence(db, session.schedule), latitude, longitude, accuracy, is_mocked)
     if not location_check.ok:
         return schemas.SelfCheckinResult(
             status=location_check.status, message=location_check.message,

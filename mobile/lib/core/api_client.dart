@@ -217,6 +217,16 @@ class ApiClient {
         await _saveTokens(resp.data!);
       });
 
+  /// Doi mat khau cua nguoi dang dang nhap. Server thu hoi moi phien cu va tra ve token moi
+  /// cho chinh phien nay - phai luu ngay, neu khong lan goi sau se bi dang xuat.
+  Future<void> changePassword(String currentPassword, String newPassword) => _guard(() async {
+        final resp = await _dio.post<Map<String, dynamic>>(
+          '/auth/change-password',
+          data: {'current_password': currentPassword, 'new_password': newPassword},
+        );
+        await _saveTokens(resp.data!);
+      });
+
   Future<void> logout() async {
     try {
       await _dio.post<dynamic>('/auth/logout', data: {'refresh_token': _refreshToken});

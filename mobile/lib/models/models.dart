@@ -163,6 +163,8 @@ class ScheduleItem {
         startTime = _s(j['start_time']),
         endTime = _s(j['end_time']),
         room = _s(j['room']),
+        roomId = _io(j['room_id']),
+        roomName = _so(j['room_name']),
         classCode = _so(j['class_code']),
         subjectName = _so(j['subject_name']),
         locationId = _io(j['location_id']),
@@ -174,6 +176,8 @@ class ScheduleItem {
   final String startTime;
   final String endTime;
   final String room;
+  final int? roomId;
+  final String? roomName;
   final String? classCode;
   final String? subjectName;
   final int? locationId;
@@ -262,6 +266,7 @@ class SessionDetail {
         endTime = _s(j['end_time']),
         lecturerName = _so(j['lecturer_name']),
         checkinDeadline = _dt(j['checkin_deadline']),
+        requireQr = _b(j['require_qr']),
         locationName = _so(j['location_name']);
 
   final int id;
@@ -278,6 +283,9 @@ class SessionDetail {
   final String endTime;
   final String? lecturerName;
   final DateTime? checkinDeadline;
+
+  /// Buoi nay bat buoc SV quet ma QR dang chieu trong phong moi tu diem danh duoc.
+  final bool requireQr;
   final String? locationName;
 
   bool get isOpen => status == 'open';
@@ -364,6 +372,9 @@ class SelfCheckinResult {
   /// Bi chan vi vi tri (can bat dinh vi/ra gan khu vuc roi lay vi tri lai).
   bool get isLocationProblem =>
       const ['location_required', 'location_mocked', 'location_inaccurate', 'out_of_range'].contains(status);
+
+  /// Ma QR thieu hoac het han - SV can quet lai ma dang chieu, khong phai chup lai anh.
+  bool get isQrProblem => const ['qr_required', 'qr_invalid'].contains(status);
 }
 
 class SessionAttendance {
@@ -544,6 +555,50 @@ class Location {
   final bool isDefault;
 }
 
+/// Phong hoc trong danh muc. `effectiveRadiusM` la ban kinh thuc su duoc ap dung khi
+/// doi chieu GPS - backend da nang len muc san neu phong co toa do rieng.
+class Room {
+  Room.fromJson(Json j)
+      : id = _i(j['id']),
+        code = _s(j['code']),
+        name = _s(j['name']),
+        locationId = _i(j['location_id']),
+        locationName = _so(j['location_name']),
+        building = _so(j['building']),
+        floor = _io(j['floor']),
+        capacity = _io(j['capacity']),
+        latitude = _fo(j['latitude']),
+        longitude = _fo(j['longitude']),
+        radiusM = _fo(j['radius_m']),
+        isActive = _b(j['is_active']),
+        effectiveRadiusM = _fo(j['effective_radius_m']),
+        scheduleCount = _i(j['schedule_count']);
+
+  final int id;
+  final String code;
+  final String name;
+  final int locationId;
+  final String? locationName;
+  final String? building;
+  final int? floor;
+  final int? capacity;
+  final double? latitude;
+  final double? longitude;
+  final double? radiusM;
+  final bool isActive;
+  final double? effectiveRadiusM;
+  final int scheduleCount;
+
+  bool get hasOwnPoint => latitude != null && longitude != null;
+
+  /// Dong mo ta ngan: toa nha, tang, suc chua - bo qua phan de trong.
+  String get details => [
+        if (building != null && building!.isNotEmpty) 'Nhà $building',
+        if (floor != null) 'Tầng $floor',
+        if (capacity != null) '$capacity chỗ',
+      ].join(' · ');
+}
+
 class StaffMember {
   StaffMember.fromJson(Json j)
       : id = _i(j['id']),
@@ -661,4 +716,55 @@ class Overview {
   final List<String> semesters;
   final OverviewStats totals;
   final List<OverviewFacultyRow> byFaculty;
+}
+
+/// Ma diem danh dang hieu luc cua mot phien - giang vien chieu len man hinh,
+/// sinh vien quet (hoac go 6 chu so). Ma tu doi sau [rotateSeconds] giay.
+class CheckinCode {
+  CheckinCode.fromJson(Json j)
+      : sessionId = _i(j['session_id']),
+        qrPayload = _s(j['qr_payload']),
+        digits = _s(j['digits']),
+        rotateSeconds = _i(j['rotate_seconds']),
+        expiresInSeconds = _i(j['expires_in_seconds']);
+
+  final int sessionId;
+  final String qrPayload;
+  final String digits;
+  final int rotateSeconds;
+  final int expiresInSeconds;
+}
+
+/// Mot thong bao trong hop thu (hien dung cho phu huynh: con duoc ghi nhan diem danh).
+class AppNotification {
+  AppNotification.fromJson(Json j)
+      : id = _i(j['id']),
+        kind = _s(j['kind']),
+        title = _s(j['title']),
+        body = _s(j['body']),
+        link = _so(j['link']),
+        createdAt = _dt(j['created_at']),
+        readAt = _dt(j['read_at']);
+
+  final int id;
+  final String kind;
+  final String title;
+  final String body;
+  final String? link;
+  final DateTime? createdAt;
+  final DateTime? readAt;
+
+  bool get isRead => readAt != null;
+}
+
+/// Tuy chon nhan thong bao cua phu huynh. [emailAvailable] = may chu da cau hinh gui email.
+class ParentPreferences {
+  ParentPreferences.fromJson(Json j)
+      : notifyEmail = _b(j['notify_email']),
+        notifyPresent = _b(j['notify_present']),
+        emailAvailable = _b(j['email_available']);
+
+  final bool notifyEmail;
+  final bool notifyPresent;
+  final bool emailAvailable;
 }

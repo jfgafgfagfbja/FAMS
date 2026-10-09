@@ -9,13 +9,15 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import IntegrityError
 
-from app.api import (auth, classes, faces, lecturers, locations, media, parents, reports,
-                     schedules, sessions, staff, students, units)
+from app.api import (auth, classes, faces, lecturers, locations, media, notifications,
+                     parents, reports, rooms, schedules, sessions, staff, students, units)
 from app.api.auth import limiter
 from app.core.config import settings
 from app.db.database import init_db
-from app.services import antispoof_service
+from app.services import antispoof_service, email_service
 from app.services.evidence_cleanup import run_cleanup_loop
+# Import la du: module tu gan bo bat su kien sinh thong bao cho phu huynh vao SQLAlchemy.
+from app.services.parent_notify import run_notification_email_loop
 from app.services.session_service import run_auto_close_loop
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,8 @@ async def lifespan(app: FastAPI):
     if settings.BACKGROUND_JOBS_ENABLED:
         tasks = [asyncio.create_task(run_cleanup_loop()),
                  asyncio.create_task(run_auto_close_loop())]
+        if email_service.is_configured():
+            tasks.append(asyncio.create_task(run_notification_email_loop()))
     yield
     for task in tasks:
         task.cancel()
@@ -65,7 +69,8 @@ app.add_middleware(
 
 for router in (auth.router, students.router, classes.router, lecturers.router,
                faces.router, sessions.router, reports.router, schedules.router,
-               parents.router, units.router, staff.router, locations.router, media.router):
+               parents.router, units.router, staff.router, locations.router, rooms.router,
+               notifications.router, media.router):
     app.include_router(router)
 
 

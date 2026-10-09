@@ -89,3 +89,13 @@ String unitTypeLabel(String type) => switch (type) {
     };
 
 const unitTypes = ['faculty', 'training', 'student_affairs', 'board'];
+
+/// Ten phong de hien thi. Phong lay tu danh muc thuong da co san chu "Phong" trong
+/// ten (VD "Phòng 101 — Nhà E2") nen khong them tien to lan nua; lich cu chi luu ma
+/// phong dang chu ("401") thi them vao cho de doc.
+String roomLabel(String room) {
+  final text = room.trim();
+  if (text.isEmpty) return 'Chưa có phòng';
+  final lower = text.toLowerCase();
+  return lower.startsWith('phòng') || lower.startsWith('phong') ? text : 'Phòng $text';
+}

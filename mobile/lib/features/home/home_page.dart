@@ -105,7 +105,7 @@ class _StudentHome extends StatelessWidget {
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text('${slot.classCode} — ${slot.subjectName}'),
-                            subtitle: Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · Phòng ${slot.room}'),
+                            subtitle: Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · ${roomLabel(slot.room)}'),
                             trailing: slot.myStatus != null
                                 ? StatusChip.attendance(slot.myStatus)
                                 : slot.sessionStatus == 'open'
@@ -279,7 +279,7 @@ class _LecturerHomeState extends State<_LecturerHome> {
                           ListTile(
                             contentPadding: EdgeInsets.zero,
                             title: Text('${s.classCode} — ${s.subjectName}'),
-                            subtitle: Text('${hhmm(s.startTime)}–${hhmm(s.endTime)} · Phòng ${s.room}'),
+                            subtitle: Text('${hhmm(s.startTime)}–${hhmm(s.endTime)} · ${roomLabel(s.room)}'),
                             trailing: _action(s),
                           ),
                       ],

@@ -1,9 +1,11 @@
+from datetime import time
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app import schemas
-from app.api.serializers import class_out, student_out
+from app.api.serializers import class_out, schedule_out, student_out
 from app.core.authz import (ACADEMIC_MANAGERS, CLASS_VIEWERS, can_view_class,
                             ensure_class_view, filter_classes, validate_faculty_id)
 from app.core.security import get_current_user, require_roles
@@ -204,8 +206,44 @@ def list_class_schedules(class_id: int, db: Session = Depends(get_db),
             class_id=class_id, student_id=student.id).first() is not None
     if not allowed:
         raise HTTPException(403, "Khong co quyen voi lop hoc phan nay")
-    return (db.query(models.Schedule).filter_by(class_id=class_id)
+    rows = (db.query(models.Schedule).filter_by(class_id=class_id)
             .order_by(models.Schedule.weekday, models.Schedule.start_time).all())
+    return [schedule_out(s) for s in rows]
+
+
+def _validate_room(db: Session, room_id: int | None) -> models.Room | None:
+    if room_id is None:
+        return None
+    room = db.get(models.Room, room_id)
+    if not room:
+        raise HTTPException(400, "Phong hoc khong ton tai")
+    if not room.is_active:
+        raise HTTPException(400, f"Phong {room.name} da ngung su dung, hay chon phong khac")
+    return room
+
+
+def _ensure_room_free(db: Session, room_id: int | None, weekday: int,
+                      start: time, end: time, exclude_id: int | None = None) -> None:
+    """Mot phong khong the chua 2 lop cung thu, trung khung gio - loi hay gap khi xep
+    thoi khoa bieu. Hai tiet lien nhau (ket thuc = bat dau) van hop le."""
+    if room_id is None:
+        return
+    query = (
+        db.query(models.Schedule)
+        .filter(models.Schedule.room_id == room_id,
+                models.Schedule.weekday == weekday,
+                models.Schedule.start_time < end,
+                models.Schedule.end_time > start)
+    )
+    if exclude_id is not None:
+        query = query.filter(models.Schedule.id != exclude_id)
+    clash = query.first()
+    if clash is None:
+        return
+    raise HTTPException(
+        400,
+        f"Phong nay da co lop {clash.clazz.class_code} hoc "
+        f"{clash.start_time.strftime('%H:%M')}-{clash.end_time.strftime('%H:%M')} cung thu")
 
 
 @router.post("/schedules", response_model=schemas.ScheduleOut)
@@ -216,11 +254,16 @@ def create_schedule(
 ):
     _get_class_or_404(db, body.class_id)
     _validate_location(db, body.location_id)
-    sched = models.Schedule(**body.model_dump())
+    room = _validate_room(db, body.room_id)
+    _ensure_room_free(db, body.room_id, body.weekday, body.start_time, body.end_time)
+    data = body.model_dump()
+    # Cot `room` dang chu luon co gia tri de du lieu cu va cho hien thi khong bi trong.
+    data["room"] = (data.get("room") or "").strip() or (room.code if room else "")
+    sched = models.Schedule(**data)
     db.add(sched)
     db.commit()
     db.refresh(sched)
-    return sched
+    return schedule_out(sched)
 
 
 @router.patch("/schedules/{schedule_id}", response_model=schemas.ScheduleOut)
@@ -236,15 +279,23 @@ def update_schedule(
     data = body.model_dump(exclude_unset=True)
     if "location_id" in data:
         _validate_location(db, data["location_id"])
+    room = _validate_room(db, data["room_id"]) if "room_id" in data else None
     start = data.get("start_time", sched.start_time)
     end = data.get("end_time", sched.end_time)
     if start is None or end is None or start >= end:
         raise HTTPException(400, "Gio bat dau phai truoc gio ket thuc")
+    weekday = data.get("weekday", sched.weekday)
+    _ensure_room_free(db, data.get("room_id", sched.room_id), weekday, start, end,
+                      exclude_id=sched.id)
+    if room is not None and not (data.get("room") or "").strip():
+        data["room"] = room.code
     for field, value in data.items():
         setattr(sched, field, value)
+    if not (sched.room or "").strip():
+        raise HTTPException(400, "Phai chon phong hoc hoac nhap ten phong")
     db.commit()
     db.refresh(sched)
-    return sched
+    return schedule_out(sched)
 
 
 @router.delete("/schedules/{schedule_id}")

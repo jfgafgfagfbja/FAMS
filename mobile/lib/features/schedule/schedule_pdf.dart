@@ -100,7 +100,7 @@ Future<List<int>> buildWeekSchedulePdf({
                                 children: [
                                   pw.Text(slot.classCode, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
                                   pw.Text(slot.subjectName, style: const pw.TextStyle(fontSize: 7.5)),
-                                  pw.Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · Phòng ${slot.room}',
+                                  pw.Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · ${roomLabel(slot.room)}',
                                       style: const pw.TextStyle(fontSize: 7)),
                                 ],
                               ),

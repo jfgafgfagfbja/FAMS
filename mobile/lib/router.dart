@@ -8,6 +8,7 @@ import 'features/admin/classes_page.dart';
 import 'features/admin/face_review_page.dart';
 import 'features/admin/lecturers_page.dart';
 import 'features/admin/locations_page.dart';
+import 'features/admin/rooms_page.dart';
 import 'features/admin/parents_page.dart';
 import 'features/admin/schedules_page.dart';
 import 'features/admin/staff_page.dart';
@@ -21,12 +22,14 @@ import 'features/auth/reset_password_page.dart';
 import 'features/auth/splash_page.dart';
 import 'features/home/home_page.dart';
 import 'features/lecturer/attendance_scan_page.dart';
+import 'features/lecturer/checkin_qr_page.dart';
 import 'features/lecturer/reports_page.dart';
 import 'features/lecturer/session_records_page.dart';
 import 'features/lecturer/sessions_page.dart';
 import 'features/office/overview_page.dart';
 import 'features/parent/child_attendance_page.dart';
 import 'features/parent/children_page.dart';
+import 'features/parent/notifications_page.dart';
 import 'features/schedule/week_schedule_page.dart';
 import 'features/student/enroll_face_page.dart';
 import 'features/student/enroll_for_student_page.dart';
@@ -42,6 +45,7 @@ const _routeRoles = <String, List<String>>{
   '/face': [Roles.student],
   '/self-checkin': [Roles.student],
   '/children': [Roles.parent],
+  '/notifications': [Roles.parent],
   '/schedule': [Roles.student, Roles.lecturer, Roles.admin, Roles.training, Roles.affairs, Roles.faculty],
   '/sessions': [Roles.lecturer, Roles.admin, Roles.training, Roles.affairs, Roles.faculty],
   '/reports': [Roles.lecturer, Roles.admin, Roles.training, Roles.affairs, Roles.faculty],
@@ -54,6 +58,7 @@ const _routeRoles = <String, List<String>>{
   '/parents': [Roles.admin, Roles.affairs, Roles.training],
   '/enroll-face': [Roles.admin, Roles.affairs, Roles.lecturer],
   '/locations': [Roles.admin, Roles.training],
+  '/rooms': [Roles.admin, Roles.training],
   '/units': [Roles.admin],
   '/staff': [Roles.admin],
 };
@@ -113,6 +118,7 @@ GoRouter buildRouter(AuthController auth) {
           ),
           // Phu huynh
           GoRoute(path: '/children', builder: (context, state) => const ChildrenPage()),
+          GoRoute(path: '/notifications', builder: (context, state) => const NotificationsPage()),
           GoRoute(
             path: '/children/:studentId',
             builder: (context, state) => ChildAttendancePage(studentId: _id(state, 'studentId')),
@@ -126,6 +132,10 @@ GoRouter buildRouter(AuthController auth) {
           GoRoute(
             path: '/sessions/:sessionId/scan',
             builder: (context, state) => AttendanceScanPage(sessionId: _id(state, 'sessionId')),
+          ),
+          GoRoute(
+            path: '/sessions/:sessionId/qr',
+            builder: (context, state) => CheckinQrPage(sessionId: _id(state, 'sessionId')),
           ),
           GoRoute(
             path: '/reports',
@@ -151,6 +161,7 @@ GoRouter buildRouter(AuthController auth) {
           GoRoute(path: '/face-review', builder: (context, state) => const FaceReviewPage()),
           GoRoute(path: '/parents', builder: (context, state) => const ParentsPage()),
           GoRoute(path: '/locations', builder: (context, state) => const LocationsPage()),
+          GoRoute(path: '/rooms', builder: (context, state) => const RoomsPage()),
           GoRoute(path: '/units', builder: (context, state) => const UnitsPage()),
           GoRoute(path: '/staff', builder: (context, state) => const StaffPage()),
         ],

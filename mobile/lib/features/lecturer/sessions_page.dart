@@ -66,7 +66,7 @@ class _SessionsPageState extends State<SessionsPage> {
                     title: Text('${sessions[i].classCode} — ${sessions[i].subjectName}'),
                     subtitle: Text(
                       '${weekdayLabel(sessions[i].sessionDate.weekday - 1)} ${fmtDate(sessions[i].sessionDate)} · '
-                      '${hhmm(sessions[i].startTime)}–${hhmm(sessions[i].endTime)} · Phòng ${sessions[i].room}'
+                      '${hhmm(sessions[i].startTime)}–${hhmm(sessions[i].endTime)} · ${roomLabel(sessions[i].room)}'
                       '${sessions[i].lecturerName != null && !perms.operateAttendance ? ' · ${sessions[i].lecturerName}' : ''}',
                     ),
                     trailing: StatusChip(

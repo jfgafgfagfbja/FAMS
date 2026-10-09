@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import (Date, DateTime, Float, ForeignKey, String, Time,
+from sqlalchemy import (Date, DateTime, Float, ForeignKey, String, Text, Time,
                         UniqueConstraint, func)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -142,6 +142,31 @@ class Location(Base):
     is_default: Mapped[bool] = mapped_column(default=False)
 
 
+class Room(Base):
+    """Phong hoc trong truong - danh muc de xep lich thay cho o chu tu do.
+
+    Phong co the co toa do rieng de lay tam doi chieu sat hon toa nha; nhung ban kinh
+    luon duoc nang len it nhat ROOM_MIN_RADIUS_M vi GPS dien thoai khong phan biet noi
+    hai phong canh nhau (sai so trong nha hang chuc met). Phong khong co toa do thi
+    dung toa do cua khu vuc (location) chua no.
+    """
+    __tablename__ = "rooms"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True)
+    name: Mapped[str] = mapped_column(String(255))
+    building: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    floor: Mapped[int | None] = mapped_column(nullable=True)
+    capacity: Mapped[int | None] = mapped_column(nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    radius_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    location_id: Mapped[int] = mapped_column(ForeignKey("locations.id"))
+    # Phong ngung su dung: an khoi o chon lich moi nhung giu nguyen lich su.
+    is_active: Mapped[bool] = mapped_column(default=True)
+
+    location: Mapped[Location] = relationship()
+
+
 class Schedule(Base):
     __tablename__ = "schedules"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -149,10 +174,13 @@ class Schedule(Base):
     weekday: Mapped[int] = mapped_column()  # 0 = thu 2
     start_time: Mapped[time] = mapped_column(Time)
     end_time: Mapped[time] = mapped_column(Time)
+    # Ten phong dang chu, giu lai cho du lieu cu va de hien thi khi chua gan room_id.
     room: Mapped[str] = mapped_column(String(50))
+    room_id: Mapped[int | None] = mapped_column(ForeignKey("rooms.id"), nullable=True)
     location_id: Mapped[int | None] = mapped_column(ForeignKey("locations.id"), nullable=True)
 
     clazz: Mapped[Class] = relationship(back_populates="schedules")
+    classroom: Mapped[Room | None] = relationship()
     location: Mapped[Location | None] = relationship()
 
 
@@ -167,6 +195,9 @@ class AttendanceSession(Base):
     opened_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(10), default="open")  # open | closed
+    # Bat thi SV phai quet ma QR dang chieu trong phong moi tu diem danh duoc - bang
+    # chung co mat trong phong manh hon GPS. Giang vien chon khi mo phien.
+    require_qr: Mapped[bool] = mapped_column(default=False)
 
     schedule: Mapped[Schedule] = relationship()
     records: Mapped[list["AttendanceRecord"]] = relationship(back_populates="session")
@@ -268,6 +299,11 @@ class Parent(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     phone: Mapped[str] = mapped_column(String(20), default="")
+    # Tuy chon nhan thong bao diem danh cua con (phu huynh tu doi trong trang Tai khoan).
+    # Di muon/vang luon co thong bao trong app; notify_present tat rieng tin "co mat" vi
+    # day la loai nhieu nhat (moi buoi mot tin) va it can chu y nhat.
+    notify_email: Mapped[bool] = mapped_column(default=True)
+    notify_present: Mapped[bool] = mapped_column(default=True)
 
     user: Mapped[User] = relationship()
     children: Mapped[list["ParentStudent"]] = relationship(
@@ -285,3 +321,37 @@ class ParentStudent(Base):
 
     parent: Mapped[Parent] = relationship(back_populates="children")
     student: Mapped[Student] = relationship()
+
+
+class Notification(Base):
+    """Thong bao gui toi mot nguoi dung - hien dung de bao phu huynh moi lan con duoc ghi
+    nhan diem danh (xem services/parent_notify.py).
+
+    Mot dong vua la muc trong hop thu cua app, vua la hang doi gui email (cac cot email_*):
+    viec diem danh chi ghi dong nay trong cung giao dich, con email do tac vu nen gui sau.
+    Gmail cham hay mat mang vi the khong lam cham hay hong viec diem danh, va thu loi duoc
+    thu gui lai.
+    """
+    __tablename__ = "notifications"
+    # Mot ban ghi diem danh chi bao mot lan cho moi loai su kien, ke ca khi luong ghi bi
+    # chay lai. Doi trang thai (vd vang -> co phep) la loai khac nen van bao them.
+    __table_args__ = (UniqueConstraint("user_id", "record_id", "kind"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(30))
+    title: Mapped[str] = mapped_column(String(255))
+    body: Mapped[str] = mapped_column(Text)
+    link: Mapped[str | None] = mapped_column(String(255), nullable=True)  # duong dan trong app
+    record_id: Mapped[int | None] = mapped_column(
+        ForeignKey("attendance_records.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # pending: cho gui | sent: da gui | failed: thu het so lan van loi | skipped: khong gui
+    # (phu huynh tat email, hoac may chu chua cau hinh SMTP)
+    email_status: Mapped[str] = mapped_column(String(10), default="skipped")
+    email_attempts: Mapped[int] = mapped_column(default=0)
+    email_error: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    emailed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    user: Mapped[User] = relationship()
+    record: Mapped["AttendanceRecord | None"] = relationship()

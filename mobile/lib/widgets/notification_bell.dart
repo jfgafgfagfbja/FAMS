@@ -13,20 +13,21 @@ String? alertTargetFor(String role) => switch (role) {
       Roles.admin || Roles.affairs => '/face-review',
       Roles.lecturer || Roles.training || Roles.faculty => '/reports',
       Roles.student => '/my-attendance',
-      Roles.board || Roles.parent => '/',
+      Roles.board => '/',
+      Roles.parent => '/notifications',
       _ => null,
     };
 
 String alertLabelFor(String role) => switch (role) {
       Roles.admin || Roles.affairs => 'khuôn mặt chờ duyệt',
       Roles.student => 'lớp vượt ngưỡng vắng',
-      Roles.parent => 'lớp của con vượt ngưỡng vắng',
+      Roles.parent => 'thông báo mới',
       _ => 'sinh viên vượt ngưỡng vắng',
     };
 
 /// So muc can chu y, lay tu du lieu that: admin/P.CTSV -> khuon mat cho duyet; GV -> SV
 /// vuot nguong vang o lop minh day; P.DT/Khoa/Ban -> SV vuot nguong trong pham vi;
-/// SV -> so lop minh vuot nguong; phu huynh -> so lop cua cac con vuot nguong.
+/// SV -> so lop minh vuot nguong; phu huynh -> so thong bao diem danh cua con chua doc.
 Future<int> countAlerts(ApiClient api, String role) async {
   switch (role) {
     case Roles.admin || Roles.affairs:
@@ -46,14 +47,9 @@ Future<int> countAlerts(ApiClient api, String role) async {
       final classes = await api.get('/students/me/attendance') as List<dynamic>;
       return classes.map((e) => ClassAttendance.fromJson(e as Json)).where((c) => c.warning).length;
     case Roles.parent:
-      final children = await api.get('/parents/me/children') as List<dynamic>;
-      var total = 0;
-      for (final child in children) {
-        final id = (child as Json)['id'];
-        final classes = await api.get('/parents/me/children/$id/attendance') as List<dynamic>;
-        total += classes.map((e) => ClassAttendance.fromJson(e as Json)).where((c) => c.warning).length;
-      }
-      return total;
+      // Phu huynh: so thong bao diem danh cua con chua doc (hop thu trong app).
+      final data = await api.get('/notifications/unread-count') as Json;
+      return data['count'] as int;
     default:
       return 0;
   }

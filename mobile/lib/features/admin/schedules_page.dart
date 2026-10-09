@@ -45,7 +45,7 @@ class SchedulesPage extends StatelessWidget {
             onTap: () => context.push('/classes/${s.classId}'),
             leading: const Icon(Icons.schedule),
             title: Text('${s.classCode} — ${s.subjectName}'),
-            subtitle: Text('${weekdayLabel(s.weekday)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)} · Phòng ${s.room}'
+            subtitle: Text('${weekdayLabel(s.weekday)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)} · ${roomLabel(s.room)}'
                 ' · ${s.locationName ?? 'Địa điểm mặc định'}'),
             trailing: perms.manageAcademic
                 ? IconButton(

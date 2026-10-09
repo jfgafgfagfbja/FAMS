@@ -152,7 +152,7 @@ String selfCheckinTitle(WeekSlot slot) {
   final area = slot.locationName == null
       ? ''
       : '\nĐiểm danh trong phạm vi ${distanceLabel(slot.locationRadiusM)} quanh ${slot.locationName}';
-  return '${slot.classCode} — ${slot.subjectName} · Phòng ${slot.room}$area';
+  return '${slot.classCode} — ${slot.subjectName} · ${roomLabel(slot.room)}$area';
 }
 
 class _SlotTile extends StatelessWidget {
@@ -220,7 +220,7 @@ class _SlotTile extends StatelessWidget {
         ),
       ),
       title: Text('${slot.classCode} — ${slot.subjectName}'),
-      subtitle: Text(['Phòng ${slot.room}', ?slot.locationName].join(' · ')),
+      subtitle: Text([roomLabel(slot.room), ?slot.locationName].join(' · ')),
       trailing: _trailing(context),
     );
   }

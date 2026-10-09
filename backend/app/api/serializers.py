@@ -68,3 +68,18 @@ def ensure_no_audit_history(db: Session, user_id: int) -> None:
     if db.query(models.AttendanceAudit).filter_by(changed_by=user_id).first():
         raise HTTPException(
             409, "Tai khoan da co lich su sua diem danh, khong the xoa (giu lai de doi chieu)")
+
+
+def room_label(schedule: models.Schedule) -> str:
+    """Ten phong de hien thi: uu tien danh muc phong, con lai lay o chu cu cua lich."""
+    return schedule.classroom.name if schedule.classroom is not None else schedule.room
+
+
+def schedule_out(s: models.Schedule) -> schemas.ScheduleOut:
+    return schemas.ScheduleOut(
+        id=s.id, class_id=s.class_id, weekday=s.weekday,
+        start_time=s.start_time, end_time=s.end_time,
+        room=s.room, room_id=s.room_id,
+        room_name=s.classroom.name if s.classroom else None,
+        location_id=s.location_id,
+    )

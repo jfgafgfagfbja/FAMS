@@ -125,6 +125,16 @@ Backend test dùng Postgres thật (cột `Vector(512)` không mock được b�
 | khoa.cntt@fams.edu.vn | khoa1234 | Văn phòng Khoa CNTT |
 | ban01@fams.edu.vn | ban12345 | Ban ngành (Thanh tra) |
 
+## Xác nhận sinh viên có mặt đúng phòng
+
+Ba lớp kiểm tra, mạnh dần:
+
+1. **Khu vực (GPS)** — tọa độ sinh viên phải nằm trong bán kính của phòng (nếu phòng có tọa độ riêng) hoặc của khu vực chứa phòng. Bán kính luôn tối thiểu `ROOM_MIN_RADIUS_M` (mặc định 50 m) vì GPS trong nhà sai số vài chục mét, không phân biệt nổi hai phòng cạnh nhau.
+2. **Mã QR trong phòng** — giảng viên bật *Yêu cầu quét mã QR* rồi chiếu mã lên máy chiếu. Mã tính từ `(id phiên + ô thời gian)` bằng HMAC, tự đổi sau `CHECKIN_QR_ROTATE_SECONDS` (mặc định 30 giây) và không lưu vào CSDL. Ảnh chụp màn hình gửi qua nhóm chat hết hạn sau tối đa 2 chu kỳ. Sinh viên quét mã hoặc nhập 6 chữ số hiện kèm.
+3. **Khuôn mặt** — nhận diện so với chính sinh viên đang đăng nhập.
+
+Phòng học quản lý ở mục **Phòng học** (admin, P.ĐT): mã phòng, tòa nhà, tầng, sức chứa, tọa độ riêng tùy chọn, thuộc một khu vực. Xếp lịch chọn phòng từ danh mục này, và hệ thống chặn xếp hai lớp cùng phòng trùng khung giờ trong cùng một thứ.
+
 ## Ghi chú
 - Lần chạy đầu, InsightFace tự tải model `buffalo_l` (~300MB).
 - Không có GPU vẫn chạy được (ONNX Runtime CPU), ~100–200ms/frame.

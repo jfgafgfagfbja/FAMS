@@ -23,11 +23,49 @@ def default_location(db: Session) -> models.Location | None:
     return db.query(models.Location).filter_by(is_default=True).first()
 
 
-def resolve_location(db: Session, schedule: models.Schedule) -> models.Location | None:
-    """Dia diem ap dung cho lich hoc: dia diem rieng, neu khong co thi dia diem mac dinh."""
+@dataclass
+class Geofence:
+    """Vong doi chieu thuc te cho mot lich hoc: tam, ban kinh va ten de hien thi."""
+    name: str
+    latitude: float
+    longitude: float
+    radius_m: float
+
+    @classmethod
+    def from_location(cls, location: models.Location) -> "Geofence":
+        return cls(location.name, location.latitude, location.longitude, location.radius_m)
+
+    @classmethod
+    def from_room(cls, room: models.Room) -> "Geofence | None":
+        """Toa do rieng cua phong neu co; ban kinh khong duoc thap hon muc san vi sai so GPS."""
+        if room.latitude is None or room.longitude is None:
+            return None
+        radius = max(room.radius_m or 0.0, settings.ROOM_MIN_RADIUS_M)
+        return cls(room.name, room.latitude, room.longitude, radius)
+
+
+def resolve_geofence(db: Session, schedule: models.Schedule,
+                     fallback: Geofence | None = None) -> Geofence | None:
+    """Vong ap dung cho lich hoc, theo thu tu uu tien tu hep den rong:
+    toa do rieng cua phong -> khu vuc chua phong -> dia diem gan truc tiep vao lich
+    (du lieu cu) -> dia diem mac dinh cua truong.
+
+    `fallback` cho phep ben goi tu truyen vong mac dinh da doc san - dung khi xu ly
+    nhieu lich mot luc de khoi truy van lai dia diem mac dinh cho tung lich.
+    """
+    room = schedule.classroom
+    if room is not None:
+        fence = Geofence.from_room(room)
+        if fence is not None:
+            return fence
+        if room.location is not None:
+            return Geofence.from_location(room.location)
     if schedule.location is not None:
-        return schedule.location
-    return default_location(db)
+        return Geofence.from_location(schedule.location)
+    if fallback is not None:
+        return fallback
+    location = default_location(db)
+    return Geofence.from_location(location) if location is not None else None
 
 
 @dataclass
@@ -40,7 +78,7 @@ class LocationCheck:
 
 
 def check_checkin_location(
-    location: models.Location | None,
+    fence: Geofence | None,
     latitude: float | None,
     longitude: float | None,
     accuracy: float | None,
@@ -49,12 +87,12 @@ def check_checkin_location(
     """Chi chan khi da cau hinh dia diem va bat SELF_CHECKIN_REQUIRE_LOCATION. Chap nhan sai so
     GPS: hop le khi (khoang cach - sai so) <= ban kinh, voi sai so toi da MAX_ACCURACY."""
     has_position = latitude is not None and longitude is not None
-    if location is None or not settings.SELF_CHECKIN_REQUIRE_LOCATION:
-        distance = (haversine_m(latitude, longitude, location.latitude, location.longitude)
-                    if location is not None and has_position else None)
+    if fence is None or not settings.SELF_CHECKIN_REQUIRE_LOCATION:
+        distance = (haversine_m(latitude, longitude, fence.latitude, fence.longitude)
+                    if fence is not None and has_position else None)
         return LocationCheck(ok=True, distance_m=distance)
 
-    radius = location.radius_m
+    radius = fence.radius_m
     if not has_position:
         return LocationCheck(
             ok=False, status="location_required", allowed_radius_m=radius,
@@ -70,10 +108,10 @@ def check_checkin_location(
                     f"{round(settings.SELF_CHECKIN_MAX_ACCURACY_M)} m). Bat dinh vi chinh xac "
                     "roi thu lai")
 
-    distance = haversine_m(latitude, longitude, location.latitude, location.longitude)
+    distance = haversine_m(latitude, longitude, fence.latitude, fence.longitude)
     if distance - (accuracy or 0) > radius:
         return LocationCheck(
             ok=False, status="out_of_range", distance_m=distance, allowed_radius_m=radius,
-            message=f"Ban dang cach {location.name} khoang {round(distance)} m, chi duoc tu "
+            message=f"Ban dang cach {fence.name} khoang {round(distance)} m, chi duoc tu "
                     f"diem danh trong ban kinh {round(radius)} m")
     return LocationCheck(ok=True, distance_m=distance, allowed_radius_m=radius)

@@ -58,7 +58,7 @@ class SessionRecordsPage extends StatelessWidget {
               runSpacing: 6,
               children: [
                 InfoLine(icon: Icons.event, text: '${weekdayLabel(session.sessionDate.weekday - 1)} ${fmtDate(session.sessionDate)} · ${hhmm(session.startTime)}–${hhmm(session.endTime)}'),
-                InfoLine(icon: Icons.meeting_room_outlined, text: 'Phòng ${session.room}'),
+                InfoLine(icon: Icons.meeting_room_outlined, text: roomLabel(session.room)),
                 if (session.locationName != null) InfoLine(icon: Icons.place_outlined, text: session.locationName!),
                 if (session.lecturerName != null) InfoLine(icon: Icons.person_outline, text: session.lecturerName!),
                 StatusChip(label: session.isOpen ? 'Đang mở' : 'Đã đóng', color: statusColor(session.isOpen ? 'open' : null)),

@@ -168,6 +168,44 @@ def reset_password(
     return {"ok": True}
 
 
+@router.post("/change-password", response_model=schemas.Token)
+@limiter.limit("10/minute")
+def change_password(
+    request: Request,
+    body: schemas.ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Nguoi dang dang nhap tu doi mat khau.
+
+    Phai nhap dung mat khau hien tai: ai do ngoi vao may dang mo san phien dang nhap cung
+    khong doi duoc mat khau de chiem tai khoan. Nhap sai nhieu lan thi bi tam khoa giong
+    dang nhap. Doi xong thu hoi moi phien khac (may khac, trinh duyet khac) - de phong
+    truong hop doi vi nghi bi lo mat khau - va cap token moi cho chinh phien nay de nguoi
+    dung khong bi dang xuat giua chung.
+    """
+    key = f"change-password:{user.id}"
+    if len(_recent_failures(key)) >= settings.LOGIN_MAX_FAILED_PER_ACCOUNT:
+        raise HTTPException(
+            429, "Nhap sai mat khau qua nhieu lan, vui long thu lai sau "
+                 f"{settings.LOGIN_FAILED_WINDOW_MINUTES} phut")
+
+    if not verify_password(body.current_password, user.password_hash):
+        _record_failure(key)
+        raise HTTPException(400, "Mat khau hien tai khong dung")
+    if verify_password(body.new_password, user.password_hash):
+        raise HTTPException(400, "Mat khau moi phai khac mat khau hien tai")
+
+    _failed_logins.pop(key, None)
+    user.password_hash = hash_password(body.new_password)
+    user.credentials_changed_at = datetime.utcnow()
+    user.token_version = (user.token_version or 0) + 1
+    revoke_all_refresh_tokens(db, user.id)
+    db.commit()
+    db.refresh(user)
+    return _issue_tokens(db, user)
+
+
 @router.post("/logout")
 def logout(
     request: Request,

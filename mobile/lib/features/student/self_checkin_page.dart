@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../models/models.dart';
 import '../../widgets/camera_capture.dart';
 import '../../widgets/common.dart';
+import '../../widgets/qr_scanner.dart';
 
 /// SV tu chup selfie diem danh: xin vi tri (co the tu choi), chup, gui len backend -
 /// backend chi so khop voi khuon mat cua CHINH SV dang dang nhap.
@@ -23,12 +24,21 @@ class SelfCheckinPage extends StatefulWidget {
   State<SelfCheckinPage> createState() => _SelfCheckinPageState();
 }
 
-enum _GeoState { loading, ok, denied, unavailable }
+/// `denied`: tu choi mot lan, hoi lai duoc. `blocked`: tu choi vinh vien, chi con
+/// duong vao cai dat he thong. `unavailable`: may da tat dinh vi hoac khong ho tro.
+enum _GeoState { loading, ok, denied, blocked, unavailable }
 
-class _SelfCheckinPageState extends State<SelfCheckinPage> {
+class _SelfCheckinPageState extends State<SelfCheckinPage>
+    with WidgetsBindingObserver, CameraLifecycleMixin {
   final _camera = CameraHandle();
+
+  @override
+  CameraHandle get camera => _camera;
   _GeoState _geoState = _GeoState.loading;
   Position? _position;
+  /// Buoi nay co bat buoc quet ma QR khong (hoi backend luc mo man hinh).
+  bool _requireQr = false;
+  String? _scannedCode;
   Uint8List? _shot;
   bool _submitting = false;
   SelfCheckinResult? _result;
@@ -40,6 +50,22 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
       if (mounted) setState(() {});
     });
     _locate();
+    _loadCheckinInfo();
+  }
+
+  Future<void> _loadCheckinInfo() async {
+    try {
+      final data = await context.read<ApiClient>().get(
+          '/sessions/${widget.sessionId}/checkin-info') as Json;
+      if (mounted) setState(() => _requireQr = data['require_qr'] == true);
+    } catch (_) {
+      // Khong lay duoc thi cu de SV chup binh thuong; backend van chan neu thieu ma.
+    }
+  }
+
+  Future<void> _scanCode() async {
+    final code = await scanCheckinCode(context);
+    if (code != null && mounted) setState(() => _scannedCode = code);
   }
 
   @override
@@ -58,7 +84,11 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _geoState = _GeoState.blocked);
+        return;
+      }
+      if (permission == LocationPermission.denied) {
         if (mounted) setState(() => _geoState = _GeoState.denied);
         return;
       }
@@ -98,6 +128,7 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
           'longitude': _position?.longitude,
           'accuracy': _position?.accuracy,
           'is_mocked': _position?.isMocked ?? false,
+          if (_scannedCode != null) 'checkin_code': _scannedCode,
         },
         files: [UploadFile('frame', shot, 'selfie.jpg')],
       ) as Json;
@@ -111,10 +142,16 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
 
   void _retake() {
     final relocate = _result?.isLocationProblem ?? false;
+    final badCode = _result?.isQrProblem ?? false;
     setState(() {
       _shot = null;
       _result = null;
       if (relocate) _geoState = _GeoState.loading;
+      if (badCode) {
+        // Ma het han hoac sai buoi: bo ma cu di de SV quet lai ma dang chieu.
+        _scannedCode = null;
+        _requireQr = true;
+      }
     });
     if (relocate) _locate();
   }
@@ -128,6 +165,11 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
           _position!.isMocked ? AppColors.warning : AppColors.success,
         ),
       _GeoState.denied => (Icons.location_off, 'Chưa cấp quyền vị trí — lớp có đối chiếu GPS sẽ không nhận điểm danh', AppColors.warning),
+      _GeoState.blocked => (
+          Icons.location_off,
+          'Quyền vị trí đang bị chặn — mở cài đặt ứng dụng để bật lại, lớp có đối chiếu GPS sẽ không nhận điểm danh',
+          AppColors.warning,
+        ),
       _GeoState.unavailable => (Icons.location_disabled, 'Không lấy được vị trí (tắt định vị hoặc không hỗ trợ)', AppColors.warning),
     };
     return StatusChip(icon: icon, label: text, color: color);
@@ -145,17 +187,39 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
             child: Text(widget.title!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
           ),
         Align(child: _geoBanner()),
-        if (_geoState == _GeoState.denied || _geoState == _GeoState.unavailable)
-          TextButton.icon(
-            onPressed: () {
-              setState(() => _geoState = _GeoState.loading);
-              _locate();
-            },
-            icon: const Icon(Icons.my_location),
-            label: const Text('Thử lấy lại vị trí'),
+        if (_geoState == _GeoState.denied || _geoState == _GeoState.blocked || _geoState == _GeoState.unavailable)
+          Wrap(
+            alignment: WrapAlignment.center,
+            children: [
+              TextButton.icon(
+                onPressed: () {
+                  setState(() => _geoState = _GeoState.loading);
+                  _locate();
+                },
+                icon: const Icon(Icons.my_location),
+                label: const Text('Thử lấy lại vị trí'),
+              ),
+              // Tu choi vinh vien thi hoi lai khong hien hop thoai nua, phai vao cai dat.
+              if (!kIsWeb && _geoState == _GeoState.blocked)
+                TextButton.icon(
+                  onPressed: Geolocator.openAppSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  label: const Text('Mở cài đặt ứng dụng'),
+                ),
+              if (!kIsWeb && _geoState == _GeoState.unavailable)
+                TextButton.icon(
+                  onPressed: Geolocator.openLocationSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  label: const Text('Mở cài đặt định vị'),
+                ),
+            ],
           ),
         const SizedBox(height: 12),
         if (result == null) ...[
+          if (_requireQr) ...[
+            CheckinCodeBanner(hasCode: _scannedCode != null, onScan: _scanCode),
+            const SizedBox(height: 8),
+          ],
           if (_shot != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -177,8 +241,14 @@ class _SelfCheckinPageState extends State<SelfCheckinPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: _submitting || _geoState == _GeoState.loading ? null : _submit,
-                    child: Text(_submitting ? 'Đang gửi…' : 'Gửi điểm danh'),
+                    onPressed: _submitting ||
+                            _geoState == _GeoState.loading ||
+                            (_requireQr && _scannedCode == null)
+                        ? null
+                        : _submit,
+                    child: Text(_submitting
+                        ? 'Đang gửi…'
+                        : (_requireQr && _scannedCode == null) ? 'Cần quét mã QR' : 'Gửi điểm danh'),
                   ),
                 ),
               ],
@@ -217,6 +287,8 @@ class _ResultCard extends StatelessWidget {
       'location_required' => (Icons.location_off, 'Cần bật định vị để điểm danh', AppColors.warning),
       'location_inaccurate' => (Icons.gps_not_fixed, 'Vị trí chưa đủ chính xác', AppColors.warning),
       'location_mocked' => (Icons.gpp_bad, 'Phát hiện vị trí giả lập', AppColors.danger),
+      'qr_required' => (Icons.qr_code_2, 'Buổi này cần quét mã QR trong phòng', AppColors.warning),
+      'qr_invalid' => (Icons.qr_code_scanner, 'Mã QR đã hết hạn hoặc không đúng buổi', AppColors.warning),
       _ => (Icons.warning_amber_rounded, 'Chưa nhận diện được', AppColors.warning),
     };
     return SectionCard(

@@ -29,6 +29,22 @@ class Settings(BaseSettings):
     # gia mao - day la lop kiem tra bo sung, khong thay the xac nhan cua giang vien.
     SELF_CHECKIN_REQUIRE_LOCATION: bool = True
     SELF_CHECKIN_MAX_ACCURACY_M: float = 100.0  # sai so GPS lon hon muc nay -> yeu cau thu lai
+    # Muc san cho ban kinh khi doi chieu theo toa do rieng cua phong. GPS trong nha sai so
+    # hang chuc met, dat thap hon muc nay se chan oan sinh vien dang ngoi dung lop.
+    ROOM_MIN_RADIUS_M: float = 50.0
+    # Ma QR diem danh doi sau bao nhieu giay. Ngan thi anh chup man hinh nhanh het han,
+    # nhung SV quet cham de truot; 30 giay la muc can bang (chap nhan ca o lien truoc
+    # nen thuc te con tu 30 den 60 giay de quet).
+    CHECKIN_QR_ROTATE_SECONDS: int = 30
+    # Mac dinh cho o "yeu cau quet ma QR" khi giang vien mo phien diem danh.
+    SELF_CHECKIN_REQUIRE_QR_DEFAULT: bool = False
+    # Dia chi cong khai cua giao dien web, dung de gan duong link "xem chi tiet" vao email
+    # gui phu huynh (vd https://fams.tail313000.ts.net). De trong thi email khong kem link.
+    APP_PUBLIC_URL: str = ""
+    # Tac vu nen gui email thong bao: bao lau quet hang doi mot lan, va thu toi da may lan
+    # cho moi thu truoc khi danh dau that bai.
+    NOTIFY_EMAIL_INTERVAL_SECONDS: int = 15
+    NOTIFY_EMAIL_MAX_ATTEMPTS: int = 3
     ABSENCE_WARN_RATIO: float = 0.2        # ti le vang (khong tinh excused) -> canh bao cam thi
 
     # Mui gio cua moi gia tri datetime luu trong DB (naive, gio dia phuong) - dung de
