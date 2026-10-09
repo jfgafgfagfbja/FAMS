@@ -156,8 +156,12 @@ class _EnrollWizard extends StatefulWidget {
   State<_EnrollWizard> createState() => _EnrollWizardState();
 }
 
-class _EnrollWizardState extends State<_EnrollWizard> {
+class _EnrollWizardState extends State<_EnrollWizard>
+    with WidgetsBindingObserver, CameraLifecycleMixin {
   final _camera = CameraHandle();
+
+  @override
+  CameraHandle get camera => _camera;
   late int _step = widget.consentGiven ? 1 : 0; // 0 = dong y, 1..3 = tu the, 4 = xong
   bool _agree = false;
   bool _busy = false;

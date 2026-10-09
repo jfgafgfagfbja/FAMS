@@ -1,0 +1,20 @@
+# Mau cau hinh khoa ky ban phat hanh Android.
+#
+# Cach dung:
+#   1. Tao khoa (chay mot lan, nho mat khau da dat):
+#        keytool -genkey -v -keystore D:\khoa\fams-release.jks -storetype JKS \
+#                -keyalg RSA -keysize 2048 -validity 10000 -alias fams
+#   2. Chep tep nay thanh android/key.properties roi dien lai 4 dong duoi.
+#   3. Build: flutter build apk --release   hoac   flutter build appbundle --release
+#
+# Luu y:
+#   - key.properties va tep .jks da nam trong .gitignore, tuyet doi khong dua len git.
+#   - Mat khoa .jks thi khong the cap nhat app da phat hanh tren CH Play, hay sao luu
+#     tep nay o noi an toan ngoai may lam viec.
+#   - storeFile tinh tu thu muc android/ (vi du ../khoa/fams-release.jks) hoac ghi
+#     duong dan tuyet doi.
+
+storeFile=D:/khoa/fams-release.jks
+storePassword=doi-mat-khau-nay
+keyAlias=fams
+keyPassword=doi-mat-khau-nay

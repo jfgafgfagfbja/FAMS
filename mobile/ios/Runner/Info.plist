@@ -21,7 +21,11 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>fams_app</string>
+	<string>FAMS</string>
+	<!-- App chi dung HTTPS/TLS chuan cua he dieu hanh, khong co ma hoa rieng.
+	     Khai bao san de khoi bi hoi lai moi lan nop ban len App Store Connect. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

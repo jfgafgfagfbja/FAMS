@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 tro len: cam sao luu va chuyen du lieu app sang may khac.
+     Token dang nhap nam trong flutter_secure_storage, duoc ma hoa bang khoa gan voi
+     tung may; chep sang may khac thi khong giai ma duoc, con de lai rui ro phien dang
+     nhap bi mang theo thiet bi. Dang nhap lai tren may moi la dung. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>

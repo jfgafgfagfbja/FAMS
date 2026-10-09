@@ -21,8 +21,12 @@ class EnrollForStudentPage extends StatefulWidget {
   State<EnrollForStudentPage> createState() => _EnrollForStudentPageState();
 }
 
-class _EnrollForStudentPageState extends State<EnrollForStudentPage> {
+class _EnrollForStudentPageState extends State<EnrollForStudentPage>
+    with WidgetsBindingObserver, CameraLifecycleMixin {
   final _camera = CameraHandle();
+
+  @override
+  CameraHandle get camera => _camera;
   final List<Uint8List> _shots = [];
   bool _sending = false;
   String? _message;

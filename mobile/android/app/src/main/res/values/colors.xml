@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mau nhan dien Truong DH Kien truc Da Nang, trung voi AppColors.brand trong lib/core/theme.dart -->
+    <color name="brand">#8E1B2E</color>
+    <color name="ic_launcher_background">#8E1B2E</color>
+</resources>

@@ -1,6 +1,5 @@
-import 'dart:typed_data';
-
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Khoi tao camera (uu tien camera truoc), xu ly quyen/loi, cho phep doi camera.
@@ -10,12 +9,20 @@ class CameraHandle {
   List<CameraDescription> cameras = const [];
   String? error;
 
+  // Nho lai lua chon dang dung de mo lai dung camera sau khi app chay nen.
+  CameraDescription? _lastDescription;
+  ResolutionPreset _lastPreset = ResolutionPreset.medium;
+  bool _preferFront = true;
+  bool _suspended = false;
+
   bool get isReady => controller?.value.isInitialized ?? false;
 
   bool get isFront => controller?.description.lensDirection == CameraLensDirection.front;
 
   Future<void> start({bool preferFront = true, ResolutionPreset preset = ResolutionPreset.medium}) async {
     error = null;
+    _preferFront = preferFront;
+    _lastPreset = preset;
     try {
       cameras = await availableCameras();
       if (cameras.isEmpty) {
@@ -39,6 +46,35 @@ class CameraHandle {
     final next = CameraController(description, preset, enableAudio: false, imageFormatGroup: ImageFormatGroup.jpeg);
     await next.initialize();
     controller = next;
+    _lastDescription = description;
+    _lastPreset = preset;
+  }
+
+  /// Tra camera lai cho he dieu hanh khi app chay nen (neu khong, luc quay lai khung
+  /// xem truoc se dung hinh hoac bao camera dang ban).
+  Future<void> suspend() async {
+    if (controller == null) return;
+    _suspended = true;
+    await dispose();
+  }
+
+  /// Mo lai dung camera vua dung truoc khi app chay nen.
+  Future<void> resume() async {
+    if (!_suspended) return;
+    _suspended = false;
+    error = null;
+    try {
+      final description = _lastDescription;
+      if (description == null) {
+        await start(preferFront: _preferFront, preset: _lastPreset);
+      } else {
+        await _open(description, _lastPreset);
+      }
+    } on CameraException catch (e) {
+      error = _describe(e);
+    } catch (e) {
+      error = 'Không mở lại được camera: $e';
+    }
   }
 
   Future<void> switchCamera() async {
@@ -70,6 +106,54 @@ class CameraHandle {
         'cameraNotFound' || 'cameraNotReadable' => 'Camera đang bận hoặc không khả dụng.',
         _ => 'Lỗi camera: ${e.description ?? e.code}',
       };
+}
+
+/// Giu camera dung nhip voi vong doi ung dung tren Android va iOS.
+///
+/// Khi nguoi dung chuyen sang app khac, nhan khoa may hoac nghe dien thoai, he dieu
+/// hanh thu hoi camera; neu khong dong roi mo lai thi luc quay lai man hinh se dung
+/// hinh (Android) hoac bao camera dang ban (iOS). Tren web trinh duyet tu lo nen bo qua.
+///
+/// Dung: `class _XState extends State<X> with WidgetsBindingObserver, CameraLifecycleMixin`
+/// va khai bao `CameraHandle get camera => _camera;`.
+mixin CameraLifecycleMixin<T extends StatefulWidget> on State<T>, WidgetsBindingObserver {
+  CameraHandle get camera;
+
+  /// Goi lai sau khi camera da mo lai xong - de lop con chay tiep viec dang do.
+  void onCameraResumed() {}
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (kIsWeb) return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        camera.suspend().then((_) {
+          if (mounted) setState(() {});
+        });
+      case AppLifecycleState.resumed:
+        camera.resume().then((_) {
+          if (!mounted) return;
+          setState(() {});
+          onCameraResumed();
+        });
+    }
+  }
 }
 
 /// Khung xem truoc camera co ti le dung, co huong dan dat mat.
