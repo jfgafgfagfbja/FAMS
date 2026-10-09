@@ -1,0 +1,83 @@
+# Trien khai that (may chu co dia chi cong khai).
+#
+# Khac voi docker-compose.yml o thu muc goc:
+#   - Caddy dung truoc, tu xin va tu gia han chung chi HTTPS cua Let's Encrypt.
+#     Can HTTPS vi trinh duyet chi cho dung camera tren HTTPS (diem danh + quet QR).
+#   - Khong mo cong nao cua db/backend/frontend ra ngoai: chi Caddy nhan 80/443,
+#     cac dich vu con lai noi nhau qua mang noi bo cua Docker.
+#   - restart: unless-stopped de may chu khoi dong lai la dich vu tu len.
+#
+# Chay:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      POSTGRES_USER: ${POSTGRES_USER:?thieu POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?thieu POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-fams}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ../backend
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-fams}
+      # Khoa ky token va URL anh. Doi khoa nay = thu hoi toan bo phien dang nhap va
+      # moi link anh da phat. Sinh bang: openssl rand -hex 32
+      SECRET_KEY: ${SECRET_KEY:?thieu SECRET_KEY - xem deploy/.env.example}
+      CORS_ORIGINS: https://${FAMS_DOMAIN:?thieu FAMS_DOMAIN}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@fams.edu.vn}
+    volumes:
+      - evidence:/app/evidence
+      # Model nhan dien (~300MB) tai ve lan dau; giu lai de khoi tai lai moi lan dung lai.
+      - insightface:/root/.insightface
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../mobile
+      args:
+        API_BASE_URL: /api
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      FAMS_DOMAIN: ${FAMS_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Giu chung chi da xin: mat volume nay thi Let's Encrypt co the cham gioi han
+      # so lan cap chung chi cho cung mot ten mien.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+volumes:
+  pgdata:
+  evidence:
+  insightface:
+  caddy_data:
+  caddy_config:

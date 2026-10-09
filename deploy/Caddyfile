@@ -1,0 +1,28 @@
+# Caddy tu xin chung chi Let's Encrypt cho ten mien trong bien FAMS_DOMAIN va tu gia han.
+# Dieu kien: ten mien da tro ve dia chi IP cua may chu, va cong 80/443 mo duoc tu Internet.
+{$FAMS_DOMAIN} {
+	encode zstd gzip
+
+	# Anh khuon mat gui len co the vai MB.
+	request_body {
+		max_size 10MB
+	}
+
+	# nginx ben trong frontend da lo viec phan luong: / -> app Flutter, /api/ -> backend.
+	reverse_proxy frontend:80
+
+	header {
+		# Buoc trinh duyet dung HTTPS cho cac lan sau.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 10MB
+			roll_keep 5
+		}
+	}
+}

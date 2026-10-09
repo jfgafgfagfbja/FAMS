@@ -21,3 +21,6 @@ skills-lock.json
 .env
 # Tai lieu/slide sinh rieng, khong thuoc ma nguon
 Claude outputs/
+
+# Cau hinh may chu that (mat khau, khoa ky)
+deploy/.env
