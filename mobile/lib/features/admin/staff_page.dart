@@ -10,7 +10,7 @@ import '../../widgets/form_dialog.dart';
 import '../../widgets/paged_list.dart';
 import '../../widgets/pickers.dart';
 
-/// Tai khoan can bo Phong Dao tao, Phong CTSV, Khoa, Ban nganh - chi admin.
+/// Tai khoan can bo Phong Dao tao, Phong CTSV, Khoa (Van phong / Lanh dao), Ban nganh - chi admin.
 class StaffPage extends StatefulWidget {
   const StaffPage({super.key});
 
@@ -40,11 +40,24 @@ class _StaffPageState extends State<StaffPage> {
         ],
         const FieldSpec('full_name', 'Họ tên'),
         FieldSpec('unit_id', 'Đơn vị', kind: FieldKind.dropdown,
-            helper: 'Vai trò tự suy ra từ loại đơn vị',
+            helper: 'Vai trò suy ra từ loại đơn vị (Khoa: chọn nhóm bên dưới)',
             options: [for (final u in units) (u.id, '${u.name} (${unitTypeLabel(u.type)})')]),
+        const FieldSpec('faculty_leader', 'Nhóm cán bộ trong Khoa', kind: FieldKind.dropdown,
+            helper: 'Chỉ áp dụng khi đơn vị là Khoa',
+            options: [
+              (false, 'Văn phòng Khoa — nhập liệu lớp, lịch, ghi danh'),
+              (true, 'Lãnh đạo Khoa — giám sát, duyệt phép, xem nhật ký'),
+            ]),
         const FieldSpec('position', 'Chức vụ', required: false),
       ],
-      initial: staff == null ? const {} : {'full_name': staff.fullName, 'unit_id': staff.unitId, 'position': staff.position},
+      initial: staff == null
+          ? const {'faculty_leader': false}
+          : {
+              'full_name': staff.fullName,
+              'unit_id': staff.unitId,
+              'faculty_leader': staff.role == Roles.facultyLeader,
+              'position': staff.position,
+            },
     );
     if (values == null || !context.mounted) return false;
     return runAction(

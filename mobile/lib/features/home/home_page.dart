@@ -93,6 +93,19 @@ class _StudentHome extends StatelessWidget {
                 ],
               ),
             ),
+            if (me.consentGiven == true && me.consentOutdated) ...[
+              const SizedBox(height: 12),
+              Card(
+                color: AppColors.warning.withValues(alpha: 0.12),
+                child: ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.warning),
+                  title: const Text('Nội dung đồng ý sử dụng dữ liệu khuôn mặt đã cập nhật'),
+                  subtitle: const Text('Vui lòng đọc lại và xác nhận.'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.go('/face'),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             SectionCard(
               title: 'Hôm nay (${weekdayLabel(DateTime.now().weekday - 1)}, ${fmtDate(DateTime.now())})',

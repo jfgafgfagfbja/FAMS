@@ -68,7 +68,7 @@ class ClassDetailPage extends StatelessWidget {
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text('${c.classCode} — ${c.subjectName}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                          if (perms.manageAcademic) ...[
+                          if (perms.editClasses) ...[
                             OutlinedButton.icon(
                               onPressed: () async {
                                 if (await editClass(context, clazz: c)) reload();
@@ -198,7 +198,7 @@ class _StudentsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (perms.manageAcademic)
+        if (perms.editClasses)
           Wrap(spacing: 12, runSpacing: 8, children: [
             FilledButton.icon(onPressed: () => _enrollOne(context), icon: const Icon(Icons.person_add_alt), label: const Text('Ghi danh')),
             OutlinedButton.icon(onPressed: () => _importCsv(context), icon: const Icon(Icons.upload_file), label: const Text('Nhập CSV (MSSV)')),
@@ -223,7 +223,7 @@ class _StudentsTab extends StatelessWidget {
                           onPressed: () => context.push('/enroll-face/${s.id}'),
                           icon: const Icon(Icons.add_a_photo_outlined),
                         ),
-                      if (perms.manageAcademic)
+                      if (perms.editClasses)
                         IconButton(
                           tooltip: 'Hủy ghi danh',
                           onPressed: () async {
@@ -313,7 +313,7 @@ class _SchedulesTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (perms.manageAcademic)
+        if (perms.editClasses)
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton.icon(
@@ -337,7 +337,7 @@ class _SchedulesTab extends StatelessWidget {
                     leading: const Icon(Icons.schedule),
                     title: Text('${weekdayLabel(s.weekday)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)}'),
                     subtitle: Text(roomLabel(s.room)),
-                    trailing: perms.manageAcademic
+                    trailing: perms.editClasses
                         ? Wrap(children: [
                             IconButton(
                               tooltip: 'Sửa',

@@ -44,6 +44,7 @@ class Me {
         major = _so(j['major']),
         cohort = _io(j['cohort']),
         consentGiven = j['consent_given'] as bool?,
+        consentOutdated = _b(j['consent_outdated']),
         faceStatus = _so(j['face_status']),
         lecturerId = _io(j['lecturer_id']),
         lecturerCode = _so(j['lecturer_code']),
@@ -66,6 +67,9 @@ class Me {
   final String? major;
   final int? cohort;
   final bool? consentGiven;
+
+  /// Da dong y nhung voi phien ban noi dung cu - can doc va xac nhan lai.
+  final bool consentOutdated;
   final String? faceStatus;
   final int? lecturerId;
   final String? lecturerCode;
@@ -92,6 +96,9 @@ class Student {
         faceEnrolled = _b(j['face_enrolled']),
         faceStatus = _s(j['face_status']).isEmpty ? 'none' : _s(j['face_status']),
         consentGiven = _b(j['consent_given']),
+        consentVersion = _so(j['consent_version']),
+        consentMethod = _so(j['consent_method']),
+        consentRecordedBy = _so(j['consent_recorded_by']),
         facultyId = _io(j['faculty_id']),
         facultyName = _so(j['faculty_name']),
         email = _so(j['email']),
@@ -105,6 +112,11 @@ class Student {
   final bool faceEnrolled;
   final String faceStatus;
   final bool consentGiven;
+  final String? consentVersion;
+
+  /// self: SV tu xac nhan trong app; paper: SV ky giay, can bo nhap thay.
+  final String? consentMethod;
+  final String? consentRecordedBy;
   final int? facultyId;
   final String? facultyName;
   final String? email;
@@ -767,4 +779,47 @@ class ParentPreferences {
   final bool notifyEmail;
   final bool notifyPresent;
   final bool emailAvailable;
+}
+
+/// Mot dong nhat ky he thong. [detail] la JSON {truong: [gia tri cu, gia tri moi]} hoac
+/// thong tin bo sung (vd ly do dang nhap that bai).
+class AuditLogEntry {
+  AuditLogEntry.fromJson(Json j)
+      : id = _i(j['id']),
+        createdAt = _dt(j['created_at']),
+        actorEmail = _so(j['actor_email']),
+        actorRole = _so(j['actor_role']),
+        action = _s(j['action']),
+        targetType = _so(j['target_type']),
+        targetId = _io(j['target_id']),
+        targetLabel = _so(j['target_label']),
+        ip = _so(j['ip']),
+        success = _b(j['success']),
+        detail = _so(j['detail']);
+
+  final int id;
+  final DateTime? createdAt;
+  final String? actorEmail;
+  final String? actorRole;
+  final String action;
+  final String? targetType;
+  final int? targetId;
+  final String? targetLabel;
+  final String? ip;
+  final bool success;
+  final String? detail;
+}
+
+/// Noi dung dong y su dung du lieu khuon mat - lay tu may chu, co phien ban.
+class ConsentPolicy {
+  ConsentPolicy.fromJson(Json j)
+      : version = _s(j['version']),
+        title = _s(j['title']),
+        items = [for (final item in (j['items'] as List<dynamic>? ?? const [])) item.toString()],
+        checkbox = _s(j['checkbox']);
+
+  final String version;
+  final String title;
+  final List<String> items;
+  final String checkbox;
 }

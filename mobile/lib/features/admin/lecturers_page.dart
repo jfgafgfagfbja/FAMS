@@ -68,7 +68,7 @@ class _LecturersPageState extends State<LecturersPage> {
             return PageResult(page.items.map(Lecturer.fromJson).toList(), page.total);
           },
           filters: [
-            if (role != Roles.faculty) UnitDropdown(value: _facultyId, onChanged: (v) => setState(() => _facultyId = v)),
+            if (!Roles.isFaculty(role)) UnitDropdown(value: _facultyId, onChanged: (v) => setState(() => _facultyId = v)),
           ],
           actions: (reload) => [
             if (perms.manageAcademic)

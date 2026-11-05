@@ -9,6 +9,7 @@ import '../../core/theme.dart';
 import '../../models/models.dart';
 import '../../widgets/camera_capture.dart';
 import '../../widgets/common.dart';
+import '../../widgets/consent_form.dart';
 
 const _poses = [
   ('front', 'Chụp thẳng', 'Nhìn thẳng vào camera, giữ khuôn mặt trong khung bầu dục.'),
@@ -16,7 +17,8 @@ const _poses = [
   ('right', 'Nghiêng phải', 'Nghiêng đầu nhẹ sang phải, vẫn giữ mặt trong khung.'),
 ];
 
-/// SV tu dang ky khuon mat (dong y dieu khoan -> 3 tu the) va quan ly du lieu cua minh.
+/// SV tu dang ky khuon mat (BAT BUOC dong y truoc -> 3 tu the) va quan ly du lieu cua minh:
+/// xem trang thai, rut dong y (xoa ngay toan bo du lieu khuon mat).
 class EnrollFacePage extends StatefulWidget {
   const EnrollFacePage({super.key});
 
@@ -54,17 +56,19 @@ class _EnrollFacePageState extends State<EnrollFacePage> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _deleteAll() async {
+  Future<void> _withdraw(int studentId) async {
     final ok = await confirmDialog(
       context,
-      title: 'Xóa toàn bộ dữ liệu khuôn mặt?',
-      message: 'Mọi ảnh/đặc trưng khuôn mặt đã đăng ký sẽ bị xóa và bạn rút lại đồng ý thu thập. '
-          'Bạn sẽ KHÔNG điểm danh bằng khuôn mặt được cho tới khi đồng ý và đăng ký lại.',
-      confirmLabel: 'Xóa dữ liệu',
+      title: 'Rút đồng ý sử dụng dữ liệu khuôn mặt?',
+      message: 'Toàn bộ ảnh và đặc trưng khuôn mặt của bạn sẽ bị xóa ngay. Bạn sẽ KHÔNG điểm danh '
+          'bằng khuôn mặt được cho tới khi đồng ý và đăng ký lại; giảng viên vẫn có thể xác nhận '
+          'có mặt cho bạn trực tiếp.',
+      confirmLabel: 'Rút đồng ý',
       destructive: true,
     );
     if (!ok || !mounted) return;
-    final done = await runAction(context, () => context.read<ApiClient>().delete('/faces/mine'), success: 'Đã xóa dữ liệu khuôn mặt');
+    final done = await runAction(context, () => context.read<ApiClient>().post('/students/$studentId/consent/withdraw'),
+        success: 'Đã rút đồng ý và xóa dữ liệu khuôn mặt');
     if (done) _load();
   }
 
@@ -73,6 +77,27 @@ class _EnrollFacePageState extends State<EnrollFacePage> {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return ErrorView(message: _error!, onRetry: _load);
     final me = context.watch<AuthController>().me!;
+
+    // Noi dung dong y da doi phien ban: doc va xac nhan lai (khong phai chup lai anh).
+    if (me.consentGiven == true && me.consentOutdated && !_wizard) {
+      return PageBody(
+        maxWidth: 640,
+        children: [
+          ConsentForm(
+            studentId: me.studentId!,
+            notice: 'Nội dung đồng ý sử dụng dữ liệu khuôn mặt đã được cập nhật. '
+                'Vui lòng đọc lại và xác nhận, hoặc rút đồng ý nếu bạn không còn đồng ý.',
+            onDone: _load,
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => _withdraw(me.studentId!),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Không đồng ý — rút đồng ý và xóa dữ liệu khuôn mặt'),
+          ),
+        ],
+      );
+    }
 
     if (_wizard || me.consentGiven != true) {
       return _EnrollWizard(
@@ -113,15 +138,28 @@ class _EnrollFacePageState extends State<EnrollFacePage> {
         ),
         const SizedBox(height: 16),
         SectionCard(
-          title: 'Dữ liệu của tôi',
-          trailing: _faces.isEmpty
-              ? null
-              : TextButton.icon(
-                  onPressed: _deleteAll,
-                  style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Xóa toàn bộ'),
+          title: 'Đồng ý sử dụng dữ liệu khuôn mặt',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Bạn đã đồng ý cho FAMS dùng dữ liệu khuôn mặt để điểm danh. Bạn có thể rút '
+                  'đồng ý bất kỳ lúc nào — toàn bộ ảnh và đặc trưng khuôn mặt sẽ bị xóa ngay.'),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => _withdraw(me.studentId!),
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+                  icon: const Icon(Icons.no_accounts_outlined),
+                  label: const Text('Rút đồng ý & xóa dữ liệu'),
                 ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SectionCard(
+          title: 'Dữ liệu của tôi',
           child: _faces.isEmpty
               ? const Text('Chưa có ảnh khuôn mặt nào.')
               : Column(
@@ -163,7 +201,6 @@ class _EnrollWizardState extends State<_EnrollWizard>
   @override
   CameraHandle get camera => _camera;
   late int _step = widget.consentGiven ? 1 : 0; // 0 = dong y, 1..3 = tu the, 4 = xong
-  bool _agree = false;
   bool _busy = false;
   Uint8List? _shot;
   String? _stepError;
@@ -187,20 +224,11 @@ class _EnrollWizardState extends State<_EnrollWizard>
     if (mounted) setState(() {});
   }
 
-  Future<void> _consent() async {
-    setState(() => _busy = true);
-    final api = context.read<ApiClient>();
-    final auth = context.read<AuthController>();
-    final ok = await runAction(context, () async {
-      await api.post('/students/${widget.studentId}/consent');
-      await auth.reloadMe();
-    });
+  Future<void> _consented() async {
+    await context.read<AuthController>().reloadMe();
     if (!mounted) return;
-    setState(() {
-      _busy = false;
-      if (ok) _step = 1;
-    });
-    if (ok) _startCamera();
+    setState(() => _step = 1);
+    _startCamera();
   }
 
   Future<void> _captureAndSend() async {
@@ -258,25 +286,7 @@ class _EnrollWizardState extends State<_EnrollWizard>
         ),
         const SizedBox(height: 16),
         if (_step == 0)
-          SectionCard(
-            title: 'Đồng ý sử dụng dữ liệu khuôn mặt',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('• Dữ liệu khuôn mặt chỉ dùng để điểm danh tại các buổi học.\n'
-                    '• Hệ thống lưu một vector đặc trưng khuôn mặt. Ảnh bạn chụp chỉ được lưu tạm để cán bộ đối chiếu khi duyệt và bị xóa ngay sau khi duyệt.\n'
-                    '• Ảnh chụp làm bằng chứng khi điểm danh chỉ lưu trong thời hạn quy định rồi tự động xóa.\n'
-                    '• Bạn có thể tự xóa toàn bộ dữ liệu khuôn mặt bất kỳ lúc nào.'),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _agree,
-                  onChanged: (v) => setState(() => _agree = v ?? false),
-                  title: const Text('Tôi đã đọc và đồng ý cho phép FAMS thu thập, xử lý dữ liệu khuôn mặt theo mục đích trên.'),
-                ),
-                FilledButton(onPressed: _agree && !_busy ? _consent : null, child: const Text('Đồng ý và tiếp tục')),
-              ],
-            ),
-          )
+          ConsentForm(studentId: widget.studentId, onDone: _consented)
         else if (_step <= 3) ...[
           Text(_poses[_step - 1].$2, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           Text(_poses[_step - 1].$3),

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const allRoles = [
   Roles.admin, Roles.lecturer, Roles.student, Roles.parent,
-  Roles.training, Roles.affairs, Roles.faculty, Roles.board,
+  Roles.training, Roles.affairs, Roles.faculty, Roles.facultyLeader, Roles.board,
 ];
 
 void main() {
@@ -35,8 +35,47 @@ void main() {
     expect(Perms(Roles.training).manageAcademic, isTrue);
     expect(Perms(Roles.training).manageStudents, isFalse);
     expect(Perms(Roles.affairs).manageStudents, isTrue);
-    expect(Perms(Roles.faculty).excuseOnly, isTrue);
     expect(Perms(Roles.faculty).operateAttendance, isFalse);
+  });
+
+  test('van phong Khoa nhap lieu, lanh dao Khoa giam sat + duyet phep', () {
+    final office = Perms(Roles.faculty);
+    final leader = Perms(Roles.facultyLeader);
+    // Van phong Khoa: sua lop/lich/ghi danh trong Khoa, khong duyet phep, khong xem nhat ky.
+    expect(office.editClasses, isTrue);
+    expect(office.approveExcuse, isFalse);
+    expect(office.viewAuditLog, isFalse);
+    // Lanh dao Khoa: khong nhap lieu, duoc duyet phep va xem nhat ky Khoa.
+    expect(leader.editClasses, isFalse);
+    expect(leader.manageAcademic, isFalse);
+    expect(leader.manageStudents, isFalse);
+    expect(leader.operateAttendance, isFalse);
+    expect(leader.approveExcuse, isTrue);
+    expect(leader.viewAuditLog, isTrue);
+    for (final p in [leader, office]) {
+      expect(p.viewStudents && p.viewLecturers && p.viewClasses && p.viewReports, isTrue);
+    }
+    // Ho so GV, phong hoc, dia diem van chi P.Dao tao/admin sua.
+    expect(office.manageAcademic, isFalse);
+    expect(Perms(Roles.training).editClasses, isTrue);
+    expect(Perms(Roles.affairs).editClasses, isFalse);
+  });
+
+  test('only admin and faculty leaders open the audit log', () {
+    for (final role in allRoles) {
+      final allowed = role == Roles.admin || role == Roles.facultyLeader;
+      expect(canAccess(role, '/audit-logs'), allowed, reason: role);
+      expect(navItemsFor(role).any((i) => i.path == '/audit-logs'), allowed, reason: role);
+    }
+  });
+
+  test('every role has a label and a list of duties', () {
+    for (final role in allRoles) {
+      expect(Roles.label(role), isNot(role), reason: role);
+      expect(Roles.duties(role), isNotEmpty, reason: role);
+    }
+    expect(Roles.isFaculty(Roles.facultyLeader) && Roles.isFaculty(Roles.faculty), isTrue);
+    expect(Roles.isStaff(Roles.facultyLeader), isTrue);
   });
 
   test('students and parents are kept out of management routes', () {

@@ -30,7 +30,7 @@ class SchedulesPage extends StatelessWidget {
             return PageResult(page.items.map(ScheduleItem.fromJson).toList(), page.total);
           },
           actions: (reload) => [
-            if (perms.manageAcademic)
+            if (perms.editClasses)
               FilledButton.icon(
                 onPressed: () async {
                   final classes = (await api.getPage('/classes')).items.map(ClassInfo.fromJson).toList();
@@ -47,7 +47,7 @@ class SchedulesPage extends StatelessWidget {
             title: Text('${s.classCode} — ${s.subjectName}'),
             subtitle: Text('${weekdayLabel(s.weekday)} · ${hhmm(s.startTime)}–${hhmm(s.endTime)} · ${roomLabel(s.room)}'
                 ' · ${s.locationName ?? 'Địa điểm mặc định'}'),
-            trailing: perms.manageAcademic
+            trailing: perms.editClasses
                 ? IconButton(
                     tooltip: 'Sửa',
                     onPressed: () async {

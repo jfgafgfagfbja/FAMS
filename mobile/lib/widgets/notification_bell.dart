@@ -11,7 +11,7 @@ import '../models/models.dart';
 /// Trang xu ly canh bao khi bam chuong, theo vai tro (null = khong hien chuong).
 String? alertTargetFor(String role) => switch (role) {
       Roles.admin || Roles.affairs => '/face-review',
-      Roles.lecturer || Roles.training || Roles.faculty => '/reports',
+      Roles.lecturer || Roles.training || Roles.faculty || Roles.facultyLeader => '/reports',
       Roles.student => '/my-attendance',
       Roles.board => '/',
       Roles.parent => '/notifications',
@@ -40,7 +40,7 @@ Future<int> countAlerts(ApiClient api, String role) async {
         warned.addAll(rows.map((row) => (row as Json)['student_id'] as int));
       }
       return warned.length;
-    case Roles.training || Roles.faculty || Roles.board:
+    case Roles.training || Roles.faculty || Roles.facultyLeader || Roles.board:
       final overview = Overview.fromJson(await api.get('/reports/overview') as Json);
       return overview.totals.warnedStudents;
     case Roles.student:

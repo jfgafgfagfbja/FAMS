@@ -289,6 +289,7 @@ class _ResultCard extends StatelessWidget {
       'location_mocked' => (Icons.gpp_bad, 'Phát hiện vị trí giả lập', AppColors.danger),
       'qr_required' => (Icons.qr_code_2, 'Buổi này cần quét mã QR trong phòng', AppColors.warning),
       'qr_invalid' => (Icons.qr_code_scanner, 'Mã QR đã hết hạn hoặc không đúng buổi', AppColors.warning),
+      'consent_required' => (Icons.privacy_tip_outlined, 'Bạn chưa đồng ý sử dụng dữ liệu khuôn mặt', AppColors.warning),
       _ => (Icons.warning_amber_rounded, 'Chưa nhận diện được', AppColors.warning),
     };
     return SectionCard(
@@ -313,7 +314,10 @@ class _ResultCard extends StatelessWidget {
           Wrap(
             spacing: 12,
             children: [
-              if (!success)
+              // Chua dong y thi thu lai cung vo ich: dua toi muc Khuon mat de doc va dong y.
+              if (result.status == 'consent_required')
+                FilledButton(onPressed: () => context.go('/face'), child: const Text('Đọc và đồng ý'))
+              else if (!success)
                 FilledButton(
                   onPressed: onRetry,
                   child: Text(result.isLocationProblem ? 'Lấy lại vị trí và thử lại' : 'Thử lại'),

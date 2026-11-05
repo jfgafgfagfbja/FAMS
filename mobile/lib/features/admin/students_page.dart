@@ -69,7 +69,7 @@ class _StudentsPageState extends State<StudentsPage> {
     final api = context.read<ApiClient>();
     return PageBody(
       children: [
-        if (perms.excuseOnly)
+        if (perms.approveExcuse)
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: Text('Chọn sinh viên để xem chuyên cần chi tiết và duyệt đơn xin phép.'),
@@ -84,7 +84,7 @@ class _StudentsPageState extends State<StudentsPage> {
             return PageResult(page.items.map(Student.fromJson).toList(), page.total);
           },
           filters: [
-            if (role != Roles.faculty) UnitDropdown(value: _facultyId, onChanged: (v) => setState(() => _facultyId = v)),
+            if (!Roles.isFaculty(role)) UnitDropdown(value: _facultyId, onChanged: (v) => setState(() => _facultyId = v)),
           ],
           actions: (reload) => [
             if (perms.manageStudents)

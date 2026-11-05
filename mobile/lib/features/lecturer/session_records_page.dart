@@ -204,7 +204,7 @@ class _RecordTile extends StatelessWidget {
             IconButton(tooltip: 'Lịch sử sửa', onPressed: () => _showAudits(context), icon: const Icon(Icons.history)),
           if (hasRecord && perms.operateAttendance)
             IconButton(tooltip: 'Sửa trạng thái', onPressed: () => _editStatus(context), icon: const Icon(Icons.edit_outlined)),
-          if (hasRecord && perms.excuseOnly && entry.status == 'absent')
+          if (hasRecord && perms.approveExcuse && entry.status == 'absent')
             TextButton(
               onPressed: () async {
                 final ok = await changeRecordStatus(context, sessionId: session.id, recordId: entry.recordId!, newStatus: 'excused', title: 'Duyệt có phép');
@@ -212,7 +212,7 @@ class _RecordTile extends StatelessWidget {
               },
               child: const Text('Duyệt có phép'),
             ),
-          if (hasRecord && perms.excuseOnly && entry.status == 'excused')
+          if (hasRecord && perms.approveExcuse && entry.status == 'excused')
             TextButton(
               onPressed: () async {
                 final ok = await changeRecordStatus(context, sessionId: session.id, recordId: entry.recordId!, newStatus: 'absent', title: 'Hủy duyệt có phép');

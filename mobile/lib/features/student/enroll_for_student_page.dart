@@ -10,6 +10,7 @@ import '../../core/roles.dart';
 import '../../models/models.dart';
 import '../../widgets/camera_capture.dart';
 import '../../widgets/common.dart';
+import '../../widgets/consent_form.dart';
 
 /// Can bo/giang vien dang ky khuon mat ho SV (vd SV khong tu thao tac duoc).
 class EnrollForStudentPage extends StatefulWidget {
@@ -84,24 +85,24 @@ class _EnrollForStudentPageState extends State<EnrollForStudentPage>
               children: [
                 StatusChip(label: faceStatusLabel(student.faceStatus), color: statusColor(student.faceStatus == 'none' ? null : student.faceStatus)),
                 const SizedBox(height: 8),
-                if (!student.consentGiven) ...[
-                  const Text('Sinh viên chưa xác nhận đồng ý thu thập dữ liệu khuôn mặt.'),
-                  const SizedBox(height: 8),
-                  if (perms.manageStudents)
-                    FilledButton(
-                      onPressed: () async {
-                        final ok = await runAction(context, () => context.read<ApiClient>().post('/students/${student.id}/consent'),
-                            success: 'Đã xác nhận đồng ý (theo văn bản SV nộp)');
-                        if (ok) reload();
-                      },
-                      child: const Text('Xác nhận đồng ý hộ'),
-                    )
-                  else
-                    const Text('Giảng viên không thể xác nhận thay — cần SV tự xác nhận hoặc Phòng CTSV xác nhận hộ.'),
-                ],
+                if (!student.consentGiven)
+                  Text(perms.manageStudents
+                      ? 'Sinh viên chưa đồng ý sử dụng dữ liệu khuôn mặt — chưa thể đăng ký. Sinh viên tự xác nhận '
+                          'trong ứng dụng, hoặc ký bản giấy để bạn ghi nhận bên dưới.'
+                      : 'Sinh viên chưa đồng ý sử dụng dữ liệu khuôn mặt — chưa thể đăng ký. Sinh viên cần tự xác '
+                          'nhận trong ứng dụng hoặc ký bản giấy tại Phòng CTSV.')
+                else
+                  Text(student.consentMethod == 'paper'
+                      ? 'Đã đồng ý theo bản giấy (ghi nhận bởi ${student.consentRecordedBy ?? '?'}).'
+                      : 'Sinh viên đã tự xác nhận đồng ý trong ứng dụng.'),
               ],
             ),
           ),
+          // Can bo khong "dong y thay" SV: chi nhap lai ban giay SV da ky.
+          if (!student.consentGiven && perms.manageStudents) ...[
+            const SizedBox(height: 16),
+            ConsentForm(studentId: student.id, paper: true, onDone: reload),
+          ],
           if (student.consentGiven) ...[
             const SizedBox(height: 16),
             CameraPreviewBox(handle: _camera),

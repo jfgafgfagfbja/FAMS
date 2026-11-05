@@ -33,6 +33,33 @@ void main() {
     });
     expect(student.semesters, ['2026.1', '2025.2']);
     expect(student.faceStatus, 'pending');
+    expect(student.consentOutdated, isFalse);  // may chu cu khong gui truong nay
+    expect(Me.fromJson({'role': 'student', 'consent_given': true, 'consent_outdated': true}).consentOutdated, isTrue);
+  });
+
+  test('Student keeps how consent was recorded; consent policy and audit log parse', () {
+    final s = Student.fromJson({
+      'id': 1, 'student_code': 'SV1', 'full_name': 'A', 'consent_given': true,
+      'consent_version': '2026-10', 'consent_method': 'paper', 'consent_recorded_by': 'ctsv01@fams.edu.vn',
+    });
+    expect(s.consentMethod, 'paper');
+    expect(s.consentRecordedBy, 'ctsv01@fams.edu.vn');
+    expect(s.consentVersion, '2026-10');
+
+    final policy = ConsentPolicy.fromJson({
+      'version': '2026-10', 'title': 'T', 'items': ['a', 'b'], 'checkbox': 'Toi dong y',
+    });
+    expect(policy.items, ['a', 'b']);
+
+    final log = AuditLogEntry.fromJson({
+      'id': 9, 'created_at': '2026-10-16T08:00:00+07:00', 'actor_email': 'admin@fams.edu.vn',
+      'actor_role': 'admin', 'action': 'class.update', 'target_type': 'class', 'target_id': 3,
+      'target_label': 'C1', 'success': true, 'detail': '{"lecturer_id": [1, 2]}',
+    });
+    expect(log.action, 'class.update');
+    expect(log.targetId, 3);
+    expect(log.success, isTrue);
+    expect(log.createdAt, isNotNull);
   });
 
   test('SessionDetail keeps local date and parses offset datetimes', () {

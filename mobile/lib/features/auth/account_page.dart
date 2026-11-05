@@ -52,6 +52,31 @@ class AccountPage extends StatelessWidget {
             ],
           ),
         ),
+        if (Roles.duties(me.role).isNotEmpty) ...[
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Chức năng của ${Roles.label(me.role)}',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final duty in Roles.duties(me.role))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2, right: 8),
+                          child: Icon(Icons.check_circle_outline, size: 18, color: AppColors.success),
+                        ),
+                        Expanded(child: Text(duty)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         if (me.role == Roles.parent) ...[
           const SizedBox(height: 16),
           const ParentNotifySettings(),

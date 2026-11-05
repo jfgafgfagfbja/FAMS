@@ -15,8 +15,10 @@ import 'students_page.dart';
 
 Future<bool> editClass(BuildContext context, {ClassInfo? clazz}) async {
   final api = context.read<ApiClient>();
+  // Van phong Khoa chi tao/sua lop cua Khoa minh: may chu tu gan Khoa, khong cho chon.
+  final pickFaculty = !Roles.isFaculty(context.read<AuthController>().role);
   final lecturersPage = await api.getPage('/lecturers');
-  final faculties = await facultyOptions(api);
+  final faculties = pickFaculty ? await facultyOptions(api) : const <(Object?, String)>[];
   if (!context.mounted) return false;
   final lecturers = lecturersPage.items.map(Lecturer.fromJson).toList();
   final creating = clazz == null;
@@ -30,7 +32,8 @@ Future<bool> editClass(BuildContext context, {ClassInfo? clazz}) async {
           options: [for (final l in lecturers) (l.id, '${l.fullName} (${l.lecturerCode})')]),
       FieldSpec('semester', 'Học kỳ', kind: FieldKind.dropdown,
           options: [for (final s in {...semesterOptions(), ?clazz?.semester}) (s, formatSemester(s))]),
-      FieldSpec('faculty_id', 'Khoa quản lý', kind: FieldKind.dropdown, required: false, options: faculties),
+      if (pickFaculty)
+        FieldSpec('faculty_id', 'Khoa quản lý', kind: FieldKind.dropdown, required: false, options: faculties),
     ],
     initial: clazz == null
         ? {'semester': '${DateTime.now().year}.1'}
@@ -85,11 +88,11 @@ class _ClassesPageState extends State<ClassesPage> {
           },
           filters: [
             SemesterDropdown(value: _semester, options: semesterOptions(), onChanged: (v) => setState(() => _semester = v)),
-            if (role != Roles.faculty && role != Roles.lecturer)
+            if (!Roles.isFaculty(role) && role != Roles.lecturer)
               UnitDropdown(value: _facultyId, onChanged: (v) => setState(() => _facultyId = v)),
           ],
           actions: (reload) => [
-            if (perms.manageAcademic)
+            if (perms.editClasses)
               FilledButton.icon(
                 onPressed: () async {
                   if (await editClass(context)) reload();

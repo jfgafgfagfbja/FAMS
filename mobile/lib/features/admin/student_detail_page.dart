@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../core/auth_controller.dart';
 import '../../core/formatters.dart';
 import '../../core/roles.dart';
+import '../../core/theme.dart';
 import '../../models/models.dart';
 import '../../widgets/attendance_views.dart';
 import '../../widgets/common.dart';
@@ -28,7 +29,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
   @override
   Widget build(BuildContext context) {
     final perms = Perms(context.watch<AuthController>().role);
-    final canExcuse = perms.excuseOnly || context.read<AuthController>().role == Roles.admin;
+    final canExcuse = perms.approveExcuse || context.read<AuthController>().role == Roles.admin;
     final api = context.read<ApiClient>();
     return AsyncLoader<Student>(
       load: () async => Student.fromJson(await api.get('/students/${widget.studentId}') as Json),
@@ -52,7 +53,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                     Wrap(spacing: 6, children: [
                       StatusChip(label: faceStatusLabel(student.faceStatus), color: statusColor(student.faceStatus == 'none' ? null : student.faceStatus)),
                       StatusChip(
-                        label: student.consentGiven ? 'Đã đồng ý thu thập' : 'Chưa đồng ý thu thập',
+                        label: !student.consentGiven
+                            ? 'Chưa đồng ý sinh trắc'
+                            : student.consentMethod == 'paper'
+                                ? 'Đã đồng ý (bản giấy)'
+                                : 'Đã đồng ý (tự xác nhận)',
                         color: statusColor(student.consentGiven ? 'approved' : null),
                       ),
                     ]),
@@ -69,8 +74,27 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                   OutlinedButton.icon(
                     onPressed: () => context.push('/enroll-face/${student.id}'),
                     icon: const Icon(Icons.add_a_photo_outlined),
-                    label: const Text('Đăng ký khuôn mặt hộ'),
+                    label: Text(student.consentGiven ? 'Đăng ký khuôn mặt hộ' : 'Ghi nhận đồng ý / đăng ký khuôn mặt'),
                   ),
+                  if (student.consentGiven)
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final ok = await confirmDialog(context,
+                            title: 'Rút đồng ý thay sinh viên?',
+                            message: 'Chỉ làm khi sinh viên nộp đơn rút đồng ý. Toàn bộ ảnh và đặc trưng khuôn mặt '
+                                'của ${student.fullName} sẽ bị xóa ngay.',
+                            confirmLabel: 'Rút đồng ý',
+                            destructive: true);
+                        if (ok && context.mounted &&
+                            await runAction(context, () => api.post('/students/${student.id}/consent/withdraw'),
+                                success: 'Đã rút đồng ý và xóa dữ liệu khuôn mặt')) {
+                          reloadStudent();
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+                      icon: const Icon(Icons.no_accounts_outlined),
+                      label: const Text('Rút đồng ý (theo đơn)'),
+                    ),
                 ],
               ],
             ),
