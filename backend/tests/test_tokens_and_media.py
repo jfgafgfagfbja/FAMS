@@ -9,7 +9,7 @@ from app.core import media
 from app.core.config import settings
 from app.db import models
 from app.services import antispoof_service, face_service
-from tests.conftest import auth_headers, login
+from tests.conftest import consent_body, auth_headers, login
 
 
 def _login_full(client, email, password):
@@ -120,7 +120,7 @@ def _enroll_one(client, seed, monkeypatch, tmp_path):
     monkeypatch.setattr(antispoof_service, "check_liveness", lambda img, bbox: (True, 0.9))
 
     token = login(client, "sv1@test.local", "sv123")
-    client.post(f"/students/{seed['sv1_id']}/consent", headers=auth_headers(token))
+    client.post(f"/students/{seed['sv1_id']}/consent", json=consent_body(), headers=auth_headers(token))
     image = cv2.imencode(".jpg", np.full((200, 200, 3), 128, dtype=np.uint8))[1].tobytes()
     resp = client.post(f"/faces/enroll/{seed['sv1_id']}", headers=auth_headers(token),
                        files={"images": ("front.jpg", image, "image/jpeg")})

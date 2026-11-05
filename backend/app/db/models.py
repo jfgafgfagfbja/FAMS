@@ -15,9 +15,12 @@ ROLE_STUDENT = "student"
 ROLE_PARENT = "parent"
 ROLE_TRAINING = "training_office"    # Phong Dao tao
 ROLE_AFFAIRS = "student_affairs"     # Phong Cong tac sinh vien
-ROLE_FACULTY = "faculty_office"      # Van phong/giao vu Khoa
+ROLE_FACULTY = "faculty_office"      # Van phong/giao vu Khoa: nhap lieu trong Khoa
+ROLE_FACULTY_LEADER = "faculty_leader"  # Lanh dao Khoa (Truong/Pho khoa): giam sat + phe duyet
 ROLE_BOARD = "board"                 # Ban nganh khac (chi xem thong ke tong hop)
-STAFF_ROLES = (ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_BOARD)
+STAFF_ROLES = (ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_FACULTY_LEADER, ROLE_BOARD)
+# Hai vai tro gan voi mot Khoa (pham vi du lieu = Khoa cua don vi can bo).
+FACULTY_ROLES = (ROLE_FACULTY, ROLE_FACULTY_LEADER)
 
 # Loai don vi -> vai tro cua can bo thuoc don vi do.
 UNIT_FACULTY = "faculty"
@@ -82,6 +85,14 @@ class Student(Base):
     faculty_id: Mapped[int | None] = mapped_column(ForeignKey("units.id"), nullable=True)
     consent_given: Mapped[bool] = mapped_column(default=False)
     consent_given_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Dong y voi noi dung phien ban nao (core/consent.py), bang cach nao (self = SV tu bam,
+    # paper = SV ky giay, can bo nhap thay) va ai ghi nhan. Luu email dang chu thay vi khoa
+    # ngoai: bang nay da co mot khoa ngoai toi users (user_id), them khoa thu hai lam
+    # quan he "user" khong con xac dinh duoc; ban chup email cung doc duoc khi tai khoan
+    # can bo da bi xoa.
+    consent_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    consent_method: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    consent_recorded_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="student")
     faculty: Mapped[Unit | None] = relationship()
@@ -355,3 +366,34 @@ class Notification(Base):
 
     user: Mapped[User] = relationship()
     record: Mapped["AttendanceRecord | None"] = relationship()
+
+
+class AuditLog(Base):
+    """Nhat ky he thong: ai, luc nao, lam gi, voi doi tuong nao, tu dia chi nao.
+
+    Moi thay doi du lieu quan ly (them/sua/xoa SV, GV, lop, lich, phong, don vi, can bo,
+    duyet khuon mat, dong y sinh trac hoc, mo/dong phien, sua ket qua diem danh...) duoc
+    ghi TU DONG o tang SQLAlchemy (services/audit.py) - khong phu thuoc tung endpoint nho
+    goi ham ghi log. Dang nhap/dang xuat/xuat bao cao thi ghi tuong minh.
+
+    Khong bao gio luu mat khau, ma OTP, vector khuon mat hay anh: cac cot do chi ghi la
+    "da thay doi". Cot actor_email/actor_role/target_label la ban chup tai thoi diem ghi
+    de van doc duoc khi tai khoan/doi tuong da bi xoa.
+    """
+    __tablename__ = "audit_logs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+    actor_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    actor_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    actor_role: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    action: Mapped[str] = mapped_column(String(50), index=True)
+    target_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    target_id: Mapped[int | None] = mapped_column(nullable=True)
+    target_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Khoa lien quan - de Lanh dao Khoa chi xem nhat ky trong pham vi Khoa minh.
+    faculty_id: Mapped[int | None] = mapped_column(
+        ForeignKey("units.id", ondelete="SET NULL"), nullable=True, index=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    success: Mapped[bool] = mapped_column(default=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON: {truong: [cu, moi]}

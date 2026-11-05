@@ -14,7 +14,8 @@ from app.core.config import settings
 from app.core.security import require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT)
+from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY_LEADER, ROLE_LECTURER,
+                           ROLE_STUDENT)
 from app.services import checkin_code_service, face_service
 from app.services.geo_service import check_checkin_location, resolve_geofence
 from app.services.session_service import (_confirm_counts, checkin_deadline,
@@ -428,6 +429,12 @@ async def self_checkin(
     if not enrolled:
         raise HTTPException(403, "Ban khong ghi danh lop hoc phan nay")
 
+    if not student.consent_given:
+        return schemas.SelfCheckinResult(
+            status="consent_required",
+            message="Ban chua dong y su dung du lieu khuon mat. Hay doc va dong y trong muc "
+                    "Khuon mat, hoac nho giang vien xac nhan tay.")
+
     existed = (
         db.query(models.AttendanceRecord)
         .filter_by(session_id=session_id, student_id=student.id)
@@ -537,7 +544,9 @@ def list_records(
 
 
 ALLOWED_EDIT_STATUSES = ("present", "late", "absent", "excused")
-EXCUSE_EDITORS = (ROLE_AFFAIRS, ROLE_FACULTY)
+# Phe duyet co phep: P.CTSV toan truong, Lanh dao Khoa trong Khoa minh (Van phong Khoa nhap
+# lieu, khong phe duyet - xem core/authz.py).
+EXCUSE_EDITORS = (ROLE_AFFAIRS, ROLE_FACULTY_LEADER)
 
 
 @router.patch("/{session_id}/records/{record_id}", response_model=schemas.RecordOut)

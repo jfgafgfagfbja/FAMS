@@ -1,38 +1,47 @@
 """Phan quyen theo vai tro va pham vi du lieu.
 
-Ma tran quyen (Sua = tao/sua/xoa, Xem = chi doc, * = chi trong Khoa cua minh):
+Ma tran quyen (Sua = tao/sua/xoa, Xem = chi doc, Duyet = phe duyet, * = chi trong Khoa minh):
 
-  Chuc nang                  Admin  P.DaoTao  P.CTSV  Khoa   Ban nganh
-  Tai khoan can bo, don vi   Sua    -         -       -      -
-  Lop HP, lich, ghi danh     Sua    Sua       Xem     Xem*   -
-  Ho so GV, phan cong GV     Sua    Sua       -       Xem*   -
-  Ho so SV, phu huynh        Sua    Xem       Sua     Xem*   -
-  Duyet khuon mat            Sua    -         Sua     -      -
-  Diem danh chi tiet + anh   Sua    Xem       Xem     Xem*   -
-  Duyet "Co phep"            Sua    -         Sua     Sua*   -
-  Canh bao vang, xuat Excel  Xem    Xem       Xem     Xem*   -
-  Thong ke tong hop          Xem    Xem       Xem     Xem*   Xem
+  Chuc nang                  Admin  P.DaoTao  P.CTSV  LanhDaoKhoa  VanPhongKhoa  BanNganh
+  Tai khoan can bo, don vi   Sua    -         -       -            -             -
+  Lop HP, lich, ghi danh,
+    phan cong GV day lop     Sua    Sua       Xem     Xem*         Sua*          -
+  Phong hoc, dia diem        Sua    Sua       Xem     Xem          Xem           -
+  Ho so giang vien           Sua    Sua       -       Xem*         Xem*          -
+  Ho so SV, phu huynh        Sua    Xem       Sua     Xem*         Xem*          -
+  Duyet khuon mat            Sua    -         Sua     -            -             -
+  Diem danh chi tiet + anh   Sua    Xem       Xem     Xem*         Xem*          -
+  Duyet "Co phep"            Duyet  -         Duyet   Duyet*       -             -
+  Canh bao vang, xuat Excel  Xem    Xem       Xem     Xem*         Xem*          -
+  Thong ke tong hop          Xem    Xem       Xem     Xem*         Xem*          Xem
+  Nhat ky he thong           Xem    -         -       Xem*         -             -
 
-Giang vien: mo phien/quet camera/sua diem danh lop minh day. SV/phu huynh: du lieu cua minh/con.
+Van phong Khoa (giao vu) lo nhap lieu cua Khoa; Lanh dao Khoa (Truong/Pho khoa) giam sat va
+phe duyet, khong nhap lieu. Giang vien: mo phien/quet camera/chieu ma QR/sua diem danh lop
+minh day. SV/phu huynh: du lieu cua minh/con.
 """
 from fastapi import HTTPException, status
 from sqlalchemy import false
 from sqlalchemy.orm import Query, Session
 
 from app.db import models
-from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_BOARD, ROLE_FACULTY, ROLE_LECTURER,
-                           ROLE_PARENT, ROLE_STUDENT, ROLE_TRAINING)
+from app.db.models import (FACULTY_ROLES, ROLE_ADMIN, ROLE_AFFAIRS, ROLE_BOARD, ROLE_FACULTY,
+                           ROLE_FACULTY_LEADER, ROLE_LECTURER, ROLE_PARENT, ROLE_STUDENT,
+                           ROLE_TRAINING)
 
 # Xem chi tiet (ten, anh bang chung...) toan truong.
 SCHOOL_WIDE_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS)
 # Nhom duoc xem chi tiet lop/phien/bao cao (co gioi han pham vi voi Khoa, GV).
-CLASS_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER)
+CLASS_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES, ROLE_LECTURER)
 # Quan ly hoc vu: lop hoc phan, lich hoc, ghi danh, ho so giang vien.
 ACADEMIC_MANAGERS = (ROLE_ADMIN, ROLE_TRAINING)
+# Nhap lieu lop hoc phan, lich hoc, ghi danh: Van phong Khoa chi trong Khoa minh
+# (ensure_class_manage), admin/P.DT toan truong.
+CLASS_EDITORS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_FACULTY)
 # Quan ly ho so SV, phu huynh, duyet khuon mat.
 STUDENT_MANAGERS = (ROLE_ADMIN, ROLE_AFFAIRS)
 # Duoc xem thong ke tong hop (khong co ten/anh).
-OVERVIEW_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_BOARD)
+OVERVIEW_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES, ROLE_BOARD)
 
 _FORBIDDEN = "Khong co quyen voi du lieu nay"
 
@@ -71,7 +80,7 @@ def ensure_class_access(user: models.User, class_id: int, db: Session) -> None:
 def can_view_class(user: models.User, clazz: models.Class, db: Session) -> bool:
     if user.role in SCHOOL_WIDE_VIEWERS:
         return True
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         return unit_id is not None and clazz.faculty_id == unit_id
     if user.role == ROLE_LECTURER:
@@ -94,7 +103,7 @@ def filter_classes(query: Query, user: models.User, db: Session) -> Query:
     """Loc query da join models.Class theo pham vi xem cua user."""
     if user.role in SCHOOL_WIDE_VIEWERS:
         return query
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         return query.filter(models.Class.faculty_id == (unit_id if unit_id is not None else -1))
     if user.role == ROLE_LECTURER:
@@ -103,12 +112,36 @@ def filter_classes(query: Query, user: models.User, db: Session) -> Query:
     return query.filter(false())
 
 
+def ensure_class_manage(user: models.User, clazz: models.Class, db: Session) -> None:
+    """Quyen SUA lop hoc phan va lich, ghi danh cua lop: admin/P.DT moi lop; Van phong Khoa
+    chi lop thuoc Khoa minh."""
+    if user.role in ACADEMIC_MANAGERS:
+        return
+    if user.role == ROLE_FACULTY:
+        unit_id = staff_unit_id(user, db)
+        if unit_id is not None and clazz.faculty_id == unit_id:
+            return
+    raise _forbid("Chi duoc sua lop hoc phan thuoc Khoa minh")
+
+
+def faculty_for_new_class(user: models.User, db: Session, requested: int | None) -> int | None:
+    """Van phong Khoa tao lop thi lop luon thuoc Khoa minh; chi dinh Khoa khac bi tu choi."""
+    if user.role != ROLE_FACULTY:
+        return requested
+    unit_id = staff_unit_id(user, db)
+    if unit_id is None:
+        raise _forbid("Tai khoan chua gan voi Khoa nao")
+    if requested is not None and requested != unit_id:
+        raise _forbid("Chi duoc tao lop hoc phan cho Khoa minh")
+    return unit_id
+
+
 # ---------------- Sinh vien ----------------
 
 def can_view_student(user: models.User, student: models.Student, db: Session) -> bool:
     if user.role in SCHOOL_WIDE_VIEWERS:
         return True
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         return unit_id is not None and student.faculty_id == unit_id
     if user.role == ROLE_LECTURER:
@@ -147,7 +180,7 @@ def filter_students(query: Query, user: models.User, db: Session) -> Query:
     """Loc query tren models.Student theo pham vi xem cua user."""
     if user.role in SCHOOL_WIDE_VIEWERS:
         return query
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         return query.filter(models.Student.faculty_id == (unit_id if unit_id is not None else -1))
     if user.role == ROLE_LECTURER:
@@ -166,7 +199,7 @@ def filter_students(query: Query, user: models.User, db: Session) -> Query:
 def filter_lecturers(query: Query, user: models.User, db: Session) -> Query:
     if user.role in ACADEMIC_MANAGERS:
         return query
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         return query.filter(models.Lecturer.faculty_id == (unit_id if unit_id is not None else -1))
     return query.filter(false())
@@ -175,10 +208,11 @@ def filter_lecturers(query: Query, user: models.User, db: Session) -> Query:
 # ---------------- Diem danh ----------------
 
 def can_excuse_record(user: models.User, record: models.AttendanceRecord, db: Session) -> bool:
-    """P.CTSV duyet co phep toan truong; Khoa duyet cho SV thuoc Khoa hoac lop Khoa quan ly."""
+    """P.CTSV duyet co phep toan truong; Lanh dao Khoa duyet cho SV thuoc Khoa hoac lop Khoa
+    quan ly. Van phong Khoa khong duyet - phe duyet la viec cua lanh dao."""
     if user.role in (ROLE_ADMIN, ROLE_AFFAIRS):
         return True
-    if user.role == ROLE_FACULTY:
+    if user.role == ROLE_FACULTY_LEADER:
         unit_id = staff_unit_id(user, db)
         if unit_id is None:
             return False

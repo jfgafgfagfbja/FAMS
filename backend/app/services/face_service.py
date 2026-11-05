@@ -212,8 +212,11 @@ def recognize_frame(
             db.query(models.Enrollment.student_id, distance.label("distance"))
             .join(models.FaceEmbedding,
                   models.FaceEmbedding.student_id == models.Enrollment.student_id)
+            .join(models.Student, models.Student.id == models.Enrollment.student_id)
             .filter(models.Enrollment.class_id == class_id,
-                    models.FaceEmbedding.status == "approved")
+                    models.FaceEmbedding.status == "approved",
+                    # SV chua dong y / da rut dong y thi khong bao gio duoc nhan dien.
+                    models.Student.consent_given.is_(True))
             .order_by(distance)
             .first()
         )

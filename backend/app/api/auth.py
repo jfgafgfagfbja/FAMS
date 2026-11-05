@@ -13,13 +13,14 @@ from app import schemas
 from app.api.serializers import face_status_of
 from app.core.authz import staff_profile
 from app.core.config import settings
+from app.core.consent import CONSENT_VERSION
 from app.core.security import (create_access_token, create_refresh_token, get_current_user,
                                hash_password, revoke_all_refresh_tokens, revoke_refresh_token,
                                revoke_token, rotate_refresh_token, verify_password)
 from app.db import models
 from app.db.database import get_db
 from app.db.models import ROLE_LECTURER, ROLE_STUDENT, STAFF_ROLES
-from app.services import email_service
+from app.services import audit, email_service
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,8 @@ def login(
 ):
     key = form.username.strip().lower()
     if len(_recent_failures(key)) >= settings.LOGIN_MAX_FAILED_PER_ACCOUNT:
+        audit.record_event(db, "auth.login_locked", request=request, email=key, success=False)
+        db.commit()
         raise HTTPException(
             429, "Dang nhap sai qua nhieu lan, vui long thu lai sau "
                  f"{settings.LOGIN_FAILED_WINDOW_MINUTES} phut")
@@ -79,10 +82,14 @@ def login(
     user = db.query(models.User).filter(models.User.email == form.username).first()
     if not user or not verify_password(form.password, user.password_hash):
         _record_failure(key)
+        # Ghi ca email da go (khong ghi mat khau) de phat hien do mat khau theo tai khoan.
+        audit.record_event(db, "auth.login_failed", request=request, email=key, success=False)
+        db.commit()
         raise HTTPException(401, "Sai email hoac mat khau")
 
     _failed_logins.pop(key, None)
-    return _issue_tokens(db, user)
+    audit.record_event(db, "auth.login", request=request, user=user)
+    return _issue_tokens(db, user)  # _issue_tokens commit luon dong nhat ky o tren
 
 
 @router.post("/refresh", response_model=schemas.Token)
@@ -213,9 +220,11 @@ def logout(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
+    audit.record_event(db, "auth.logout", request=request, user=user)
     revoke_token(db, request.state.token_payload)
     if body and body.refresh_token:
         revoke_refresh_token(db, body.refresh_token, user.id)
+    db.commit()
     return {"ok": True}
 
 
@@ -234,6 +243,8 @@ def get_me(
             data.update(
                 student_id=student.id, student_code=student.student_code, major=student.major,
                 cohort=student.cohort, consent_given=student.consent_given,
+                consent_outdated=(student.consent_given
+                                  and student.consent_version != CONSENT_VERSION),
                 face_status=face_status_of(student),
                 faculty_id=student.faculty_id,
                 faculty_name=student.faculty.name if student.faculty else None,

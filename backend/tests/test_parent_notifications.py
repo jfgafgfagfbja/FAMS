@@ -31,7 +31,10 @@ def parent(db_session, seed):
 
 
 @pytest.fixture()
-def matched_face(monkeypatch):
+def matched_face(monkeypatch, db_session, seed):
+    """Khuon mat SV1 khop. Ngoai doi chi khop duoc khi SV da dong y va dang ky khuon mat."""
+    db_session.get(models.Student, seed["sv1_id"]).consent_given = True
+    db_session.commit()
     monkeypatch.setattr(face_service, "recognize_self", lambda db, data, student_id: {
         "status": "matched", "confidence": 0.91, "liveness_score": 0.9, "bbox": [0, 0, 10, 10]})
 

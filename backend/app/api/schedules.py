@@ -10,14 +10,14 @@ from app.core.config import settings
 from app.core.security import get_current_user, require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT,
+from app.db.models import (FACULTY_ROLES, ROLE_ADMIN, ROLE_AFFAIRS, ROLE_LECTURER, ROLE_STUDENT,
                            ROLE_TRAINING)
 from app.api.serializers import room_label
 from app.services.geo_service import Geofence, default_location, resolve_geofence
 
 router = APIRouter(prefix="/schedules", tags=["schedules"])
 
-SCHEDULE_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY)
+SCHEDULE_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES)
 
 
 def open_from_time(start: time) -> time:
@@ -83,7 +83,7 @@ def week_schedule(
     if user.role == ROLE_STUDENT:
         student = db.query(models.Student).filter_by(user_id=user.id).first()
         class_ids = [e.class_id for e in student.enrollments] if student else []
-    elif user.role in (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER):
+    elif user.role in (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES, ROLE_LECTURER):
         class_ids = [c.id for c in filter_classes(db.query(models.Class), user, db).all()]
     else:
         class_ids = []

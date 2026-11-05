@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.db import models
 from app.services import face_service
 from app.services.session_service import auto_close_expired_sessions
-from tests.conftest import auth_headers, login
+from tests.conftest import consent_body, auth_headers, login
 
 
 def _open_session(client, seed):
@@ -128,7 +128,7 @@ def test_lecturer_session_list_scoped_to_own_classes(client, seed):
 
 def test_lecturer_cannot_enroll_face_for_student_outside_classes(client, seed):
     admin = _admin(client)
-    client.post(f"/students/{seed['sv2_id']}/consent", headers=admin)
+    client.post(f"/students/{seed['sv2_id']}/consent", json=consent_body("paper"), headers=admin)
     token = login(client, "gv1@test.local", "gv123")
     resp = client.post(f"/faces/enroll/{seed['sv2_id']}", headers=auth_headers(token),
                        files={"images": ("f.jpg", b"x", "image/jpeg")})

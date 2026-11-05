@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import get_db
 from app.db import models
+from app.services.audit import set_actor
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -70,6 +71,8 @@ def get_current_user(
             "Token da bi thu hoi do doi mat khau, vui long dang nhap lai")
 
     request.state.token_payload = payload
+    # Moi thay doi du lieu trong request nay duoc ghi nhat ky dung ten nguoi nay (services/audit.py).
+    set_actor(db, user, request)
     return user
 
 

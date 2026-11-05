@@ -5,13 +5,14 @@ from app import schemas
 from app.core.security import require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_BOARD, ROLE_FACULTY, ROLE_LECTURER,
+from app.db.models import (FACULTY_ROLES, ROLE_ADMIN, ROLE_AFFAIRS, ROLE_BOARD, ROLE_LECTURER,
                            ROLE_TRAINING)
 
 router = APIRouter(prefix="/units", tags=["units"])
 
 # Danh sach don vi dung cho dropdown chon Khoa o cac form va bo loc thong ke.
-UNIT_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_BOARD, ROLE_LECTURER)
+UNIT_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES, ROLE_BOARD,
+                     ROLE_LECTURER)
 
 
 def _get_unit_or_404(db: Session, unit_id: int) -> models.Unit:

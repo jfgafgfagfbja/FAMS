@@ -94,6 +94,9 @@ class StaffCreate(BaseModel):
     full_name: str
     unit_id: int
     position: str = ""
+    # Chi co nghia voi don vi loai Khoa: True = Lanh dao Khoa (Truong/Pho khoa, giam sat +
+    # phe duyet), False = Van phong Khoa (giao vu, nhap lieu).
+    faculty_leader: bool = False
 
     @field_validator("password")
     @classmethod
@@ -107,6 +110,7 @@ class StaffUpdate(BaseModel):
     full_name: str | None = None
     unit_id: int | None = None
     position: str | None = None
+    faculty_leader: bool | None = None
 
 
 class StaffOut(BaseModel):
@@ -150,6 +154,9 @@ class StudentOut(BaseModel):
     face_enrolled: bool = False
     face_status: str = "none"  # none | pending | approved | rejected
     consent_given: bool = False
+    consent_version: str | None = None
+    consent_method: str | None = None       # self | paper
+    consent_recorded_by: str | None = None  # email nguoi ghi nhan
     faculty_id: int | None = None
     faculty_name: str | None = None
     email: str | None = None
@@ -656,6 +663,8 @@ class MeOut(BaseModel):
     major: str | None = None
     cohort: int | None = None
     consent_given: bool | None = None
+    # Da dong y nhung voi noi dung phien ban cu -> app nhac doc va xac nhan lai.
+    consent_outdated: bool | None = None
     face_status: str | None = None
     lecturer_id: int | None = None
     lecturer_code: str | None = None
@@ -798,3 +807,36 @@ class ParentPreferencesOut(BaseModel):
 class ParentPreferencesUpdate(BaseModel):
     notify_email: bool | None = None
     notify_present: bool | None = None
+
+
+# ---- Nhat ky he thong ----
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_at: LocalDateTime
+    actor_id: int | None = None
+    actor_email: str | None = None
+    actor_role: str | None = None
+    action: str
+    target_type: str | None = None
+    target_id: int | None = None
+    target_label: str | None = None
+    ip: str | None = None
+    success: bool
+    detail: str | None = None  # JSON {truong: [cu, moi]}
+
+
+# ---- Dong y sinh trac hoc ----
+class ConsentPolicyOut(BaseModel):
+    version: str
+    title: str
+    items: list[str]
+    checkbox: str
+
+
+class ConsentRequest(BaseModel):
+    """Phai gui dung phien ban noi dung dang hien hanh: SV dong y voi cai da doc."""
+    agreed: bool
+    version: str
+    method: str = "self"  # self: SV tu bam | paper: SV ky giay, can bo nhap thay

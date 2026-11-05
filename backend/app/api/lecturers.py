@@ -12,11 +12,11 @@ from app.core.authz import ACADEMIC_MANAGERS, filter_lecturers, validate_faculty
 from app.core.security import get_current_user, hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import ROLE_ADMIN, ROLE_FACULTY, ROLE_LECTURER, ROLE_TRAINING
+from app.db.models import FACULTY_ROLES, ROLE_ADMIN, ROLE_LECTURER, ROLE_TRAINING
 
 router = APIRouter(prefix="/lecturers", tags=["lecturers"])
 
-LECTURER_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_FACULTY)
+LECTURER_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, *FACULTY_ROLES)
 
 
 def _get_lecturer_or_404(db: Session, lecturer_id: int) -> models.Lecturer:

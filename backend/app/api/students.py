@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -9,17 +7,19 @@ from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
                                  student_out)
 from app.core.authz import (STUDENT_MANAGERS, ensure_student_view, filter_students,
                             validate_faculty_id)
+from app.core import consent as consent_policy
 from app.core.config import settings
 from app.core.security import get_current_user, hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import (ROLE_ADMIN, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER, ROLE_STUDENT,
+from app.services.consent_service import record_consent, withdraw_consent
+from app.db.models import (FACULTY_ROLES, ROLE_ADMIN, ROLE_AFFAIRS, ROLE_LECTURER, ROLE_STUDENT,
                            ROLE_TRAINING)
 
 router = APIRouter(prefix="/students", tags=["students"])
 
-STUDENT_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY, ROLE_LECTURER)
-ATTENDANCE_DETAIL_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, ROLE_FACULTY)
+STUDENT_LIST_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES, ROLE_LECTURER)
+ATTENDANCE_DETAIL_VIEWERS = (ROLE_ADMIN, ROLE_TRAINING, ROLE_AFFAIRS, *FACULTY_ROLES)
 
 
 def _get_student_or_404(db: Session, student_id: int) -> models.Student:
@@ -79,6 +79,14 @@ def list_students(
     if limit is not None:
         query = query.limit(limit)
     return [student_out(s) for s in query.all()]
+
+
+@router.get("/consent-policy", response_model=schemas.ConsentPolicyOut)
+def consent_policy_text(_user: models.User = Depends(get_current_user)):
+    """Noi dung dong y su dung du lieu khuon mat dang hien hanh (co phien ban)."""
+    return schemas.ConsentPolicyOut(
+        version=consent_policy.CONSENT_VERSION, title=consent_policy.CONSENT_TITLE,
+        items=consent_policy.consent_items(), checkbox=consent_policy.CONSENT_CHECKBOX)
 
 
 @router.get("/me", response_model=schemas.StudentOut)
@@ -251,16 +259,48 @@ def delete_student(
 @router.post("/{student_id}/consent")
 def give_consent(
     student_id: int,
+    body: schemas.ConsentRequest,
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    """Xac nhan dong y cho phep thu thap du lieu khuon mat. Chi chinh SV do, hoac
-    admin/P.CTSV xac nhan ho (vd SV nop ban giay)."""
+    """Ghi nhan dong y su dung du lieu khuon mat.
+
+    - Chinh SV: method="self", sau khi doc noi dung trong app.
+    - P.CTSV/admin: chi method="paper" - SV da ky ban giay, can bo nhap thay; ghi lai ten
+      can bo da nhap. Can bo khong "dong y thay" SV khi khong co giay.
+    Bat buoc gui dung phien ban noi dung dang hien hanh: dong y voi dung cai da doc.
+    """
     student = _get_student_or_404(db, student_id)
     is_self = user.role == ROLE_STUDENT and student.user_id == user.id
     if not is_self and user.role not in STUDENT_MANAGERS:
         raise HTTPException(403, "Chi sinh vien hoac admin/P.CTSV moi xac nhan duoc dong y")
-    student.consent_given = True
-    student.consent_given_at = datetime.now()
+    if not body.agreed:
+        raise HTTPException(400, "Can tick xac nhan dong y")
+    if body.version != consent_policy.CONSENT_VERSION:
+        raise HTTPException(409, "Noi dung dong y da thay doi, vui long doc lai noi dung moi")
+    expected = consent_policy.METHOD_SELF if is_self else consent_policy.METHOD_PAPER
+    if body.method != expected:
+        raise HTTPException(
+            400, "Sinh vien tu xac nhan trong ung dung" if is_self
+            else "Can bo chi nhap dong y khi sinh vien da ky ban giay (method=paper)")
+    record_consent(student, expected, user.email)
     db.commit()
-    return {"ok": True, "consent_given": True}
+    return {"ok": True, "consent_given": True, "version": student.consent_version,
+            "method": student.consent_method}
+
+
+@router.post("/{student_id}/consent/withdraw")
+def withdraw_student_consent(
+    student_id: int,
+    db: Session = Depends(get_db),
+    user: models.User = Depends(get_current_user),
+):
+    """Rut dong y: xoa ngay toan bo anh va vector khuon mat. SV tu rut, hoac P.CTSV/admin
+    lam thay khi SV nop don."""
+    student = _get_student_or_404(db, student_id)
+    is_self = user.role == ROLE_STUDENT and student.user_id == user.id
+    if not is_self and user.role not in STUDENT_MANAGERS:
+        raise HTTPException(403, "Chi sinh vien hoac admin/P.CTSV moi rut duoc dong y")
+    deleted = withdraw_consent(db, student)
+    db.commit()
+    return {"ok": True, "consent_given": False, "deleted": deleted}

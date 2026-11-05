@@ -10,6 +10,7 @@ from app.db import models
 from app.db.database import get_db
 from app.db.models import ROLE_LECTURER, ROLE_STUDENT
 from app.services import face_service
+from app.services.consent_service import withdraw_consent
 
 router = APIRouter(prefix="/faces", tags=["faces"])
 
@@ -86,14 +87,9 @@ def delete_my_faces(
     """SV tu xoa TOAN BO du lieu khuon mat cua minh va rut lai dong y thu thap - sau do
     khong diem danh bang khuon mat duoc nua cho toi khi dong y + dang ky lai."""
     student = _my_student(db, user)
-    embeddings = db.query(models.FaceEmbedding).filter_by(student_id=student.id).all()
-    for emb in embeddings:
-        delete_media(emb.source_image)
-        db.delete(emb)
-    student.consent_given = False
-    student.consent_given_at = None
+    deleted = withdraw_consent(db, student)
     db.commit()
-    return {"ok": True, "deleted": len(embeddings)}
+    return {"ok": True, "deleted": deleted}
 
 
 @router.get("/pending", response_model=list[schemas.FacePendingOut])

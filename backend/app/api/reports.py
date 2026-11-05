@@ -13,7 +13,8 @@ from app.core.config import settings
 from app.core.security import get_current_user, require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import ROLE_FACULTY
+from app.db.models import FACULTY_ROLES
+from app.services import audit
 from app.services.attendance_stats import STATUSES, compute_class_attendance_stats
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -136,6 +137,10 @@ def export_attendance(
     buffer.seek(0)
 
     filename = f"diemdanh_{clazz.class_code}_{semester}.xlsx"
+    # Du lieu diem danh (ten, MSSV, ket qua) roi khoi he thong - ghi lai ai da xuat.
+    audit.record_event(db, "report.exported", target_type="class", target_id=clazz.id,
+                       target_label=clazz.class_code, detail={"semester": semester})
+    db.commit()
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -205,7 +210,7 @@ def attendance_overview(
     khong anh) nen Ban nganh cung xem duoc; can bo Khoa chi thay Khoa cua minh.
     Khong truyen semester -> hoc ky moi nhat co lop hoc phan."""
     class_query = db.query(models.Class)
-    if user.role == ROLE_FACULTY:
+    if user.role in FACULTY_ROLES:
         unit_id = staff_unit_id(user, db)
         unit = db.get(models.Unit, unit_id) if unit_id else None
         class_query = class_query.filter(models.Class.faculty_id == (unit_id or -1))

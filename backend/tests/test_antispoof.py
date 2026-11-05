@@ -35,6 +35,8 @@ def sv1_embedding(db_session, seed):
     emb = emb / np.linalg.norm(emb)
     db_session.add(models.FaceEmbedding(student_id=seed["sv1_id"], embedding=emb.tolist(),
                                         status="approved"))
+    # Co khuon mat da duyet nghia la SV da dong y sinh trac hoc.
+    db_session.get(models.Student, seed["sv1_id"]).consent_given = True
     db_session.commit()
     return emb
 

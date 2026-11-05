@@ -157,3 +157,10 @@ def login(client, email, password):
 
 def auth_headers(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def consent_body(method="self"):
+    """Than request dong y su dung du lieu khuon mat, dung phien ban noi dung hien hanh.
+    method="paper" khi can bo nhap thay ban giay SV da ky."""
+    from app.core.consent import CONSENT_VERSION
+    return {"agreed": True, "version": CONSENT_VERSION, "method": method}

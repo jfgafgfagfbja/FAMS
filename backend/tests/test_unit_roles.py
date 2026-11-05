@@ -25,6 +25,8 @@ def org(db_session, seed):
         "ctsv@test.local": (ctsv, "student_affairs"),
         "khoa.cntt@test.local": (cntt, "faculty_office"),
         "khoa.kt@test.local": (kt, "faculty_office"),
+        "ldk.cntt@test.local": (cntt, "faculty_leader"),
+        "ldk.kt@test.local": (kt, "faculty_leader"),
         "ban@test.local": (ban, "board"),
     }
     for email, (unit, role) in accounts.items():
@@ -148,26 +150,87 @@ def test_faculty_office_sees_only_own_faculty(client, seed, org):
     assert client.get(f"/reports/attendance/{seed['class2_id']}", headers=h).status_code == 403
 
 
-def test_faculty_office_cannot_edit_academic_or_student_records(client, seed, org):
+def test_faculty_office_edits_only_own_faculty_classes(client, seed, org):
+    """Van phong Khoa nhap lieu lop/lich/ghi danh - nhung chi trong Khoa minh."""
     h = _h(client, "khoa.cntt@test.local")
     assert client.patch(f"/classes/{seed['class1_id']}", json={"subject_name": "Doi"},
-                        headers=h).status_code == 403
+                        headers=h).status_code == 200                      # lop CNTT
+    assert client.patch(f"/classes/{seed['class2_id']}", json={"subject_name": "Doi"},
+                        headers=h).status_code == 403                      # lop Kien truc
+    assert client.post("/classes/schedules", json={
+        "class_id": seed["class2_id"], "weekday": 2, "room": "A1",
+        "start_time": "07:00:00", "end_time": "09:00:00"}, headers=h).status_code == 403
+    assert client.post(f"/classes/{seed['class1_id']}/enroll/{seed['sv2_id']}",
+                       headers=h).status_code == 200
+    # Ho so sinh vien van la viec cua P.CTSV.
     assert client.patch(f"/students/{seed['sv1_id']}", json={"major": "Doi"},
                         headers=h).status_code == 403
 
 
-def test_faculty_office_excuse_scoped_to_faculty(client, db_session, seed, org):
+def test_faculty_office_new_class_always_in_own_faculty(client, db_session, seed, org):
+    h = _h(client, "khoa.cntt@test.local")
+    lecturer_id = db_session.query(models.Lecturer).first().id
+    body = {"class_code": "CNTT-01", "subject_name": "Mon moi", "semester": "2026.1",
+            "lecturer_id": lecturer_id}
+    resp = client.post("/classes", json=body, headers=h)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["faculty_id"] == org["cntt_id"]
+    other = client.post("/classes", json={**body, "class_code": "KT-01", "faculty_id": org["kt_id"]},
+                        headers=h)
+    assert other.status_code == 403
+
+
+def test_faculty_office_no_longer_approves_excuses(client, db_session, seed, org):
+    """Phe duyet la viec cua Lanh dao Khoa, khong phai giao vu."""
+    session_id, record_id = _closed_session_with_absent(db_session, seed)
+    resp = client.patch(f"/sessions/{session_id}/records/{record_id}",
+                        json={"status": "excused", "reason": "x"},
+                        headers=_h(client, "khoa.cntt@test.local"))
+    assert resp.status_code == 403
+
+
+def test_faculty_leader_excuse_scoped_to_faculty(client, db_session, seed, org):
     session_id, record_id = _closed_session_with_absent(db_session, seed)  # sv1, class1: CNTT
 
     other = client.patch(f"/sessions/{session_id}/records/{record_id}",
                          json={"status": "excused", "reason": "x"},
-                         headers=_h(client, "khoa.kt@test.local"))
+                         headers=_h(client, "ldk.kt@test.local"))
     assert other.status_code == 403
 
     own = client.patch(f"/sessions/{session_id}/records/{record_id}",
                        json={"status": "excused", "reason": "Don cua Khoa"},
-                       headers=_h(client, "khoa.cntt@test.local"))
+                       headers=_h(client, "ldk.cntt@test.local"))
     assert own.status_code == 200
+
+
+def test_faculty_leader_supervises_but_does_not_enter_data(client, seed, org):
+    h = _h(client, "ldk.cntt@test.local")
+    # Xem duoc du lieu cua Khoa minh...
+    classes = client.get("/classes", headers=h).json()
+    assert [c["class_code"] for c in classes] == ["C1"]
+    assert client.get(f"/reports/attendance/{seed['class1_id']}", headers=h).status_code == 200
+    assert client.get("/reports/overview", headers=h).json()["scope"] == "faculty"
+    # ...nhung khong nhap lieu.
+    assert client.patch(f"/classes/{seed['class1_id']}", json={"subject_name": "Doi"},
+                        headers=h).status_code == 403
+    assert client.post("/classes", json={"class_code": "X", "subject_name": "X",
+                                         "semester": "2026.1"}, headers=h).status_code == 403
+    assert client.get(f"/classes/{seed['class2_id']}", headers=h).status_code == 403
+
+
+def test_admin_creates_faculty_leader_account(client, seed, org):
+    admin = auth_headers(login(client, "admin@test.local", "admin123"))
+    resp = client.post("/staff", json={"email": "truongkhoa@fams.edu.vn", "password": "truongkhoa1",
+                                       "full_name": "Truong khoa", "unit_id": org["cntt_id"],
+                                       "position": "Truong khoa", "faculty_leader": True},
+                       headers=admin)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["role"] == "faculty_leader"
+
+    bad = client.post("/staff", json={"email": "x@fams.edu.vn", "password": "abcdefgh1",
+                                      "full_name": "X", "unit_id": org["pdt_id"], "faculty_leader": True},
+                      headers=admin)
+    assert bad.status_code == 400
 
 
 def test_staff_can_view_student_attendance_detail(client, db_session, seed, org):

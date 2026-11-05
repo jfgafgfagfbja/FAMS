@@ -8,7 +8,8 @@ from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
 from app.core.security import hash_password, require_roles
 from app.db import models
 from app.db.database import get_db
-from app.db.models import ROLE_ADMIN, ROLE_BY_UNIT_TYPE
+from app.db.models import (ROLE_ADMIN, ROLE_BY_UNIT_TYPE, ROLE_FACULTY, ROLE_FACULTY_LEADER,
+                           UNIT_FACULTY)
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
@@ -52,18 +53,28 @@ def list_staff(
     return [staff_out(s) for s in query.all()]
 
 
+def _role_for(unit: models.Unit, faculty_leader: bool) -> str:
+    """Vai tro cua can bo theo don vi. Don vi Khoa co hai vai tro: Lanh dao Khoa hoac Van
+    phong Khoa; cac don vi khac chi co mot."""
+    if unit.type == UNIT_FACULTY:
+        return ROLE_FACULTY_LEADER if faculty_leader else ROLE_FACULTY
+    if faculty_leader:
+        raise HTTPException(400, "Chi don vi loai Khoa moi co Lanh dao Khoa")
+    return ROLE_BY_UNIT_TYPE[unit.type]
+
+
 @router.post("", response_model=schemas.StaffOut)
 def create_staff(
     body: schemas.StaffCreate,
     db: Session = Depends(get_db),
     _user: models.User = Depends(require_roles(ROLE_ADMIN)),
 ):
-    """Tao tai khoan can bo phong ban. Vai tro suy ra tu loai don vi (Khoa ->
-    faculty_office, P.Dao tao -> training_office, P.CTSV -> student_affairs, Ban -> board)."""
+    """Tao tai khoan can bo phong ban. Vai tro suy ra tu loai don vi (Khoa -> Van phong
+    Khoa, hoac Lanh dao Khoa neu faculty_leader; P.Dao tao, P.CTSV, Ban nganh)."""
     ensure_email_available(db, body.email)
     unit = _get_unit(db, body.unit_id)
     user = models.User(email=body.email, password_hash=hash_password(body.password),
-                       role=ROLE_BY_UNIT_TYPE[unit.type], full_name=body.full_name)
+                       role=_role_for(unit, body.faculty_leader), full_name=body.full_name)
     db.add(user)
     db.flush()
     staff = models.Staff(user_id=user.id, unit_id=unit.id, position=body.position)
@@ -88,10 +99,12 @@ def update_staff(
         staff.user.full_name = data["full_name"]
     if "position" in data and data["position"] is not None:
         staff.position = data["position"]
-    if data.get("unit_id") is not None:
-        unit = _get_unit(db, data["unit_id"])
+    if data.get("unit_id") is not None or data.get("faculty_leader") is not None:
+        unit = _get_unit(db, data["unit_id"]) if data.get("unit_id") is not None else staff.unit
+        leader = (data["faculty_leader"] if data.get("faculty_leader") is not None
+                  else staff.user.role == ROLE_FACULTY_LEADER)
         staff.unit_id = unit.id
-        staff.user.role = ROLE_BY_UNIT_TYPE[unit.type]
+        staff.user.role = _role_for(unit, leader)
     db.commit()
     db.refresh(staff)
     return staff_out(staff)

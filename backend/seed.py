@@ -25,12 +25,13 @@ LOCATIONS = [
     ("CS-NUITHANH", "Co so chinh - 566 Nui Thanh", 16.0322, 108.2213, 200.0),
 ]
 
-# email, mat khau, ho ten, ma don vi, chuc vu
+# email, mat khau, ho ten, ma don vi, chuc vu, la Lanh dao Khoa
 STAFF = [
-    ("pdt01@fams.edu.vn", "pdt12345", "Le Thi Dao Tao", "P-DT", "Chuyen vien"),
-    ("ctsv01@fams.edu.vn", "ctsv1234", "Pham Van Cong Tac", "P-CTSV", "Chuyen vien"),
-    ("khoa.cntt@fams.edu.vn", "khoa1234", "Nguyen Thi Giao Vu", "K-CNTT", "Giao vu Khoa"),
-    ("ban01@fams.edu.vn", "ban12345", "Hoang Van Thanh Tra", "B-TTPC", "Truong ban"),
+    ("pdt01@fams.edu.vn", "pdt12345", "Le Thi Dao Tao", "P-DT", "Chuyen vien", False),
+    ("ctsv01@fams.edu.vn", "ctsv1234", "Pham Van Cong Tac", "P-CTSV", "Chuyen vien", False),
+    ("khoa.cntt@fams.edu.vn", "khoa1234", "Nguyen Thi Giao Vu", "K-CNTT", "Giao vu Khoa", False),
+    ("ldk.cntt@fams.edu.vn", "ldk12345", "Tran Van Truong Khoa", "K-CNTT", "Truong Khoa", True),
+    ("ban01@fams.edu.vn", "ban12345", "Hoang Van Thanh Tra", "B-TTPC", "Truong ban", False),
 ]
 
 
@@ -46,12 +47,13 @@ def seed_units_and_staff(db) -> list[str]:
         units[code] = unit
 
     created = []
-    for email, password, full_name, unit_code, position in STAFF:
+    for email, password, full_name, unit_code, position, leader in STAFF:
         if db.query(models.User).filter_by(email=email).first():
             continue
         unit = units[unit_code]
+        role = models.ROLE_FACULTY_LEADER if leader else models.ROLE_BY_UNIT_TYPE[unit.type]
         user = models.User(email=email, password_hash=hash_password(password),
-                           role=models.ROLE_BY_UNIT_TYPE[unit.type], full_name=full_name)
+                           role=role, full_name=full_name)
         db.add(user)
         db.flush()
         db.add(models.Staff(user_id=user.id, unit_id=unit.id, position=position))

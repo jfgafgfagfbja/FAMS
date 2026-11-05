@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app import schemas
 from app.api.serializers import class_out, schedule_out, student_out
-from app.core.authz import (ACADEMIC_MANAGERS, CLASS_VIEWERS, can_view_class,
+from app.core.authz import (CLASS_EDITORS, CLASS_VIEWERS, can_view_class,
+                            ensure_class_manage, faculty_for_new_class,
                             ensure_class_view, filter_classes, validate_faculty_id)
 from app.core.security import get_current_user, require_roles
 from app.db import models
@@ -55,12 +56,14 @@ def _student_counts(db: Session, class_ids: list[int]) -> dict[int, int]:
 def create_class(
     body: schemas.ClassCreate,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
     _ensure_class_code_available(db, body.class_code)
     _validate_lecturer(db, body.lecturer_id)
-    validate_faculty_id(db, body.faculty_id)
-    clazz = models.Class(**body.model_dump())
+    data = body.model_dump()
+    data["faculty_id"] = faculty_for_new_class(user, db, data.get("faculty_id"))
+    validate_faculty_id(db, data["faculty_id"])
+    clazz = models.Class(**data)
     db.add(clazz)
     db.commit()
     db.refresh(clazz)
@@ -114,10 +117,14 @@ def update_class(
     class_id: int,
     body: schemas.ClassUpdate,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
     clazz = _get_class_or_404(db, class_id)
+    ensure_class_manage(user, clazz, db)
     data = body.model_dump(exclude_unset=True)
+    if "faculty_id" in data:
+        # Van phong Khoa khong chuyen lop sang Khoa khac.
+        data["faculty_id"] = faculty_for_new_class(user, db, data["faculty_id"])
     if data.get("class_code"):
         _ensure_class_code_available(db, data["class_code"], exclude_id=class_id)
     if data.get("lecturer_id") is not None:
@@ -135,9 +142,10 @@ def update_class(
 def delete_class(
     class_id: int,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
     clazz = _get_class_or_404(db, class_id)
+    ensure_class_manage(user, clazz, db)
     if db.query(models.Enrollment).filter_by(class_id=class_id).first():
         raise HTTPException(409, "Lop hoc phan da co sinh vien ghi danh, khong the xoa truc tiep")
     if db.query(models.Schedule).filter_by(class_id=class_id).first():
@@ -152,9 +160,9 @@ def enroll_student(
     class_id: int,
     student_id: int,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
-    _get_class_or_404(db, class_id)
+    ensure_class_manage(user, _get_class_or_404(db, class_id), db)
     if not db.get(models.Student, student_id):
         raise HTTPException(404, "Sinh vien khong ton tai")
     if db.query(models.Enrollment).filter_by(class_id=class_id, student_id=student_id).first():
@@ -169,8 +177,9 @@ def unenroll_student(
     class_id: int,
     student_id: int,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
+    ensure_class_manage(user, _get_class_or_404(db, class_id), db)
     enrollment = db.query(models.Enrollment).filter_by(
         class_id=class_id, student_id=student_id).first()
     if not enrollment:
@@ -250,9 +259,9 @@ def _ensure_room_free(db: Session, room_id: int | None, weekday: int,
 def create_schedule(
     body: schemas.ScheduleCreate,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
-    _get_class_or_404(db, body.class_id)
+    ensure_class_manage(user, _get_class_or_404(db, body.class_id), db)
     _validate_location(db, body.location_id)
     room = _validate_room(db, body.room_id)
     _ensure_room_free(db, body.room_id, body.weekday, body.start_time, body.end_time)
@@ -271,11 +280,12 @@ def update_schedule(
     schedule_id: int,
     body: schemas.ScheduleUpdate,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
     sched = db.get(models.Schedule, schedule_id)
     if not sched:
         raise HTTPException(404, "Lich hoc khong ton tai")
+    ensure_class_manage(user, sched.clazz, db)
     data = body.model_dump(exclude_unset=True)
     if "location_id" in data:
         _validate_location(db, data["location_id"])
@@ -302,11 +312,12 @@ def update_schedule(
 def delete_schedule(
     schedule_id: int,
     db: Session = Depends(get_db),
-    _user: models.User = Depends(require_roles(*ACADEMIC_MANAGERS)),
+    user: models.User = Depends(require_roles(*CLASS_EDITORS)),
 ):
     sched = db.get(models.Schedule, schedule_id)
     if not sched:
         raise HTTPException(404, "Lich hoc khong ton tai")
+    ensure_class_manage(user, sched.clazz, db)
     if db.query(models.AttendanceSession).filter_by(schedule_id=schedule_id).first():
         raise HTTPException(
             409, "Lich hoc da co phien diem danh, khong the xoa truc tiep")
