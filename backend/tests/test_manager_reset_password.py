@@ -102,12 +102,13 @@ def test_student_affairs_cannot_reset_lecturer_or_staff(client, seed, org):
     assert _can_login(client, "gv1@test.local", "gv123")
 
 
-@pytest.mark.parametrize("role", ["training_office", "faculty_office", "faculty_leader", "board"])
-def test_other_staff_cannot_reset_anyone(client, seed, org, role):
-    headers = _staff(client, role)
-    for path in (f"/students/{seed['sv1_id']}", f"/parents/{org['parent_id']}",
-                 f"/lecturers/{org['lecturer_id']}", f"/staff/{org['staff']['board']}"):
-        assert _reset(client, headers, path).status_code == 403, path
+def test_other_staff_cannot_reset_anyone(client, seed, org):
+    paths = (f"/students/{seed['sv1_id']}", f"/parents/{org['parent_id']}",
+             f"/lecturers/{org['lecturer_id']}", f"/staff/{org['staff']['board']}")
+    for role in ("training_office", "faculty_office", "faculty_leader", "board"):
+        headers = _staff(client, role)
+        for path in paths:
+            assert _reset(client, headers, path).status_code == 403, f"{role} -> {path}"
 
 
 def test_lecturer_cannot_reset_student(client, seed):
