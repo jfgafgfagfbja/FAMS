@@ -214,8 +214,8 @@ class _SlotTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(hhmm(slot.startTime), style: const TextStyle(fontWeight: FontWeight.w700)),
-            Text(hhmm(slot.endTime), style: const TextStyle(fontSize: 12)),
+            Text(hhmm(slot.startTime), maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text(hhmm(slot.endTime), maxLines: 1, style: const TextStyle(fontSize: 12)),
           ],
         ),
       ),

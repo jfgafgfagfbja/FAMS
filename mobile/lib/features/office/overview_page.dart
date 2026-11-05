@@ -11,14 +11,13 @@ import '../../core/theme.dart';
 import '../../models/models.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/common.dart';
+import '../../widgets/dashboard.dart';
 import '../../widgets/pickers.dart';
 
-/// Thong ke chuyen can tong hop (chi so lieu): admin, P.DT, P.CTSV, Khoa (pham vi Khoa),
-/// Ban nganh. Kem loi tat toi cac chuc nang theo vai tro.
+/// Trang chu cua can bo: thong ke chuyen can tong hop (chi so lieu) cho admin, P.DT, P.CTSV,
+/// Khoa (pham vi Khoa), Ban nganh, kem loi tat toi cac chuc nang theo vai tro.
 class OverviewPage extends StatefulWidget {
-  const OverviewPage({super.key, this.showAdminShortcuts = false});
-
-  final bool showAdminShortcuts;
+  const OverviewPage({super.key});
 
   @override
   State<OverviewPage> createState() => _OverviewPageState();
@@ -48,75 +47,85 @@ class _OverviewPageState extends State<OverviewPage> {
       builder: (context, data, reload) {
         final (overview, pendingFaces) = data;
         final t = overview.totals;
-        final shortcuts = navItemsFor(auth.role).where((item) => item.path != '/' && item.path != '/account').toList();
-        return PageBody(
-          maxWidth: 1200,
-          onRefresh: reload,
-          children: [
-            Wrap(
-              spacing: 16,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Xin chào, ${me.fullName}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                    Text([Roles.label(me.role), me.unitName].whereType<String>().toSet().join(' · ')),
-                  ],
+        final wide = isWideScreen(context);
+        final perms = Perms(auth.role);
+        final shortcuts = shortcutsFor(auth.role);
+        final warnedOnTap = perms.viewReports ? () => context.go('/reports') : null;
+
+        final profile = ProfileCard(
+          title: 'Thông tin cán bộ',
+          name: me.fullName,
+          onDetail: () => context.go('/account'),
+          trailing: SemesterDropdown(
+            value: _semester ?? overview.semester,
+            options: overview.semesters,
+            allowLatest: false,
+            width: 200,
+            onChanged: (v) => setState(() => _semester = v),
+          ),
+          fields: [
+            ('Họ tên', me.fullName),
+            ('Email', me.email),
+            ('Vai trò', Roles.label(me.role)),
+            if (me.unitName != null) ('Đơn vị', me.unitName!),
+            if (me.position != null && me.position!.isNotEmpty) ('Chức vụ', me.position!),
+            ('Phạm vi', overview.scopeName),
+          ],
+        );
+        // O tren cung la viec dang cho xu ly: khuon mat cho duyet neu vai tro duoc duyet,
+        // con lai la sinh vien vuot nguong vang.
+        final tiles = TileColumn(
+          top: pendingFaces != null
+              ? DashTile(
+                  label: 'Khuôn mặt chờ duyệt',
+                  value: '$pendingFaces',
+                  icon: Icons.face_outlined,
+                  onTap: () => context.go('/face-review'),
+                )
+              : DashTile(
+                  label: 'Sinh viên vượt ngưỡng vắng',
+                  value: '${t.warnedStudents}',
+                  icon: Icons.warning_amber_rounded,
+                  onTap: warnedOnTap,
                 ),
-                SemesterDropdown(value: _semester ?? overview.semester, options: overview.semesters, allowLatest: false, onChanged: (v) => setState(() => _semester = v)),
-                StatusChip(icon: Icons.visibility_outlined, label: 'Phạm vi: ${overview.scopeName}', color: AppColors.accent),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ResponsiveGrid(
-              minItemWidth: 200,
-              children: [
-                StatCard(label: 'Lớp học phần', value: '${t.classes}', icon: Icons.class_outlined),
-                StatCard(label: 'Sinh viên', value: '${t.students}', icon: Icons.school_outlined),
-                StatCard(label: 'Giảng viên', value: '${t.lecturers}', icon: Icons.co_present_outlined),
-                StatCard(label: 'Buổi đã điểm danh', value: '${t.closedSessions}', icon: Icons.event_available_outlined),
-                StatCard(label: 'Tỉ lệ đi học', value: percent(t.attendanceRate), icon: Icons.trending_up, color: AppColors.success),
-                StatCard(label: 'Tỉ lệ vắng', value: percent(t.absentRate), icon: Icons.trending_down, color: AppColors.danger),
-                StatCard(
+          left: DashTile(label: 'Tỉ lệ đi học', value: percent(t.attendanceRate), icon: Icons.trending_up, tone: TileTone.blue),
+          right: pendingFaces != null
+              ? DashTile(
                   label: 'SV vượt ngưỡng vắng',
                   value: '${t.warnedStudents}',
                   icon: Icons.warning_amber_rounded,
-                  color: t.warnedStudents > 0 ? AppColors.danger : AppColors.success,
-                  onTap: Perms(auth.role).viewReports ? () => context.go('/reports') : null,
-                ),
-                if (pendingFaces != null)
-                  StatCard(
-                    label: 'Khuôn mặt chờ duyệt',
-                    value: '$pendingFaces',
-                    icon: Icons.face_outlined,
-                    color: pendingFaces > 0 ? AppColors.warning : AppColors.success,
-                    onTap: () => context.go('/face-review'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            LayoutBuilder(builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 800;
-              final pie = SectionCard(title: 'Phân bổ trạng thái điểm danh', child: _StatusPie(stats: t));
-              final bars = SectionCard(title: 'Tỉ lệ đi học theo Khoa', child: _FacultyBars(rows: overview.byFaculty));
-              return wide
-                  ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Expanded(flex: 2, child: pie),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 3, child: bars),
-                    ])
-                  : Column(children: [pie, const SizedBox(height: 16), bars]);
-            }),
-            const SizedBox(height: 16),
-            SectionCard(
-              title: 'Chi tiết theo Khoa',
-              padding: const EdgeInsets.fromLTRB(0, 16, 0, 0),
-              child: overview.byFaculty.isEmpty
-                  ? const Padding(padding: EdgeInsets.all(16), child: Text('Chưa có lớp học phần trong học kỳ này.'))
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
+                  tone: TileTone.amber,
+                  onTap: warnedOnTap,
+                )
+              : DashTile(label: 'Tỉ lệ vắng', value: percent(t.absentRate), icon: Icons.trending_down, tone: TileTone.amber),
+        );
+        final stats = ResponsiveGrid(
+          minItemWidth: 200,
+          maxColumns: 4,
+          spacing: kCardGap,
+          children: [
+            StatCard(label: 'Lớp học phần', value: '${t.classes}', icon: Icons.class_outlined),
+            StatCard(label: 'Sinh viên', value: '${t.students}', icon: Icons.school_outlined),
+            StatCard(label: 'Giảng viên', value: '${t.lecturers}', icon: Icons.co_present_outlined),
+            StatCard(label: 'Buổi đã điểm danh', value: '${t.closedSessions}', icon: Icons.event_available_outlined),
+          ],
+        );
+        final charts = CardRow(
+          flexes: const [3, 2],
+          children: [
+            SectionCard(title: 'Tỉ lệ đi học theo Khoa', child: _FacultyBars(rows: overview.byFaculty)),
+            SectionCard(title: 'Phân bổ trạng thái điểm danh', child: _StatusPie(stats: t)),
+          ],
+        );
+        final table = SectionCard(
+          title: 'Chi tiết theo Khoa',
+          child: overview.byFaculty.isEmpty
+              ? const Text('Chưa có lớp học phần trong học kỳ này.')
+              : LayoutBuilder(
+                  builder: (context, constraints) => SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: constraints.maxWidth),
                       child: DataTable(
                         columns: const [
                           DataColumn(label: Text('Khoa')),
@@ -141,24 +150,25 @@ class _OverviewPageState extends State<OverviewPage> {
                         ],
                       ),
                     ),
-            ),
-            if (shortcuts.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              SectionCard(
-                title: 'Chức năng',
-                child: ResponsiveGrid(
-                  minItemWidth: 180,
-                  children: [
-                    for (final item in shortcuts)
-                      OutlinedButton.icon(
-                        onPressed: () => context.go(item.path),
-                        icon: Icon(item.icon),
-                        label: Align(alignment: Alignment.centerLeft, child: Text(item.label)),
-                      ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+        );
+        const gap = SizedBox(height: kCardGap);
+        final grid = shortcuts.isEmpty ? null : ShortcutGrid(items: shortcuts);
+        return PageBody(
+          onRefresh: reload,
+          children: [
+            CardRow(flexes: const [7, 5], children: [profile, tiles]),
+            gap,
+            // Man hinh rong: loi tat ngay duoi the thong tin. Dien thoai da co ngan keo nen
+            // day xuong cuoi, de so lieu len tren.
+            if (wide && grid != null) ...[grid, gap],
+            stats,
+            gap,
+            charts,
+            gap,
+            table,
+            if (!wide && grid != null) ...[gap, grid],
           ],
         );
       },
@@ -212,7 +222,7 @@ class _StatusPie extends StatelessWidget {
                   child: Row(children: [
                     Icon(Icons.circle, size: 12, color: p.$3),
                     const SizedBox(width: 6),
-                    Text('${p.$1}: ${p.$2}'),
+                    Flexible(child: Text('${p.$1}: ${p.$2}')),
                   ]),
                 ),
             ],

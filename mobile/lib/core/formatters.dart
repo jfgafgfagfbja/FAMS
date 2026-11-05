@@ -99,3 +99,21 @@ String roomLabel(String room) {
   final lower = text.toLowerCase();
   return lower.startsWith('phòng') || lower.startsWith('phong') ? text : 'Phòng $text';
 }
+
+const _vietnameseMarks = {
+  'a': 'àáạảãâầấậẩẫăằắặẳẵ',
+  'e': 'èéẹẻẽêềếệểễ',
+  'i': 'ìíịỉĩ',
+  'o': 'òóọỏõôồốộổỗơờớợởỡ',
+  'u': 'ùúụủũưừứựửữ',
+  'y': 'ỳýỵỷỹ',
+  'd': 'đ',
+};
+
+final _plainLetters = {
+  for (final entry in _vietnameseMarks.entries)
+    for (final letter in entry.value.split('')) letter: entry.key,
+};
+
+/// Chu thuong khong dau, de tim kiem go khong dau van ra ket qua.
+String plainText(String text) => text.toLowerCase().split('').map((c) => _plainLetters[c] ?? c).join();

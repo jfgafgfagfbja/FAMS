@@ -132,8 +132,12 @@ class EmptyView extends StatelessWidget {
 }
 
 /// Khung noi dung trang: gioi han chieu rong tren man hinh lon, padding deu.
+/// Chieu rong toi da cua vung noi dung va khoang cach giua cac the, theo cong sinh vien.
+const kContentMaxWidth = 1240.0;
+const kCardGap = 15.0;
+
 class PageBody extends StatelessWidget {
-  const PageBody({super.key, required this.children, this.maxWidth = 1100, this.onRefresh});
+  const PageBody({super.key, required this.children, this.maxWidth = kContentMaxWidth, this.onRefresh});
 
   final List<Widget> children;
   final double maxWidth;
@@ -179,7 +183,7 @@ class SectionCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(title ?? '', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      child: Text(title ?? '', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w700)),
                     ),
                     ?trailing,
                   ],
@@ -234,16 +238,17 @@ class StatCard extends StatelessWidget {
 
 /// Luoi the tu dong so cot theo chieu rong.
 class ResponsiveGrid extends StatelessWidget {
-  const ResponsiveGrid({super.key, required this.children, this.minItemWidth = 220, this.spacing = 12});
+  const ResponsiveGrid({super.key, required this.children, this.minItemWidth = 220, this.spacing = 12, this.maxColumns = 6});
 
   final List<Widget> children;
   final double minItemWidth;
   final double spacing;
+  final int maxColumns;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
-      final columns = (constraints.maxWidth / minItemWidth).floor().clamp(1, 6);
+      final columns = (constraints.maxWidth / minItemWidth).floor().clamp(1, maxColumns);
       final itemWidth = (constraints.maxWidth - spacing * (columns - 1)) / columns;
       return Wrap(
         spacing: spacing,
@@ -281,7 +286,9 @@ class StatusChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 14, color: color), const SizedBox(width: 4)],
-          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12.5)),
+          Flexible(
+            child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 12.5)),
+          ),
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,10 @@ import '../../core/formatters.dart';
 import '../../core/roles.dart';
 import '../../core/theme.dart';
 import '../../models/models.dart';
+import '../../widgets/app_shell.dart';
 import '../../widgets/common.dart';
+import '../../widgets/dashboard.dart';
+import '../../widgets/pickers.dart';
 import '../office/overview_page.dart';
 import '../parent/children_page.dart';
 import '../schedule/week_schedule_page.dart' show selfCheckinTitle;
@@ -24,7 +28,6 @@ class HomePage extends StatelessWidget {
       Roles.student => const _StudentHome(),
       Roles.lecturer => const _LecturerHome(),
       Roles.parent => const ChildrenPage(),
-      Roles.admin => const OverviewPage(showAdminShortcuts: true),
       _ => const OverviewPage(),
     };
   }
@@ -33,16 +36,45 @@ class HomePage extends StatelessWidget {
 // ---------------- Sinh vien ----------------
 
 class _StudentHomeData {
-  _StudentHomeData(this.today, this.attendance);
+  _StudentHomeData(this.week, this.today, this.attendance);
 
+  final List<WeekSlot> week;
   final List<WeekSlot> today;
   final List<ClassAttendance> attendance;
 }
 
-class _StudentHome extends StatelessWidget {
+/// Viec sinh vien can lam, xep tu quan trong nhat: (noi dung, trang xu ly).
+List<(String, String)> studentReminders(Me me, List<ClassAttendance> attendance) {
+  final warned = attendance.where((c) => c.warning).length;
+  return [
+    if (me.consentGiven != true)
+      ('Chưa đồng ý sử dụng dữ liệu khuôn mặt', '/face')
+    else if (me.consentOutdated)
+      ('Nội dung đồng ý đã cập nhật, cần xác nhận lại', '/face'),
+    if (me.consentGiven == true && me.faceStatus != 'approved')
+      (
+        switch (me.faceStatus) {
+          'pending' => 'Ảnh khuôn mặt đang chờ duyệt',
+          'rejected' => 'Ảnh khuôn mặt bị từ chối, cần đăng ký lại',
+          _ => 'Chưa đăng ký khuôn mặt',
+        },
+        '/face',
+      ),
+    if (warned > 0) ('$warned lớp vượt ngưỡng vắng, nguy cơ cấm thi', '/my-attendance'),
+  ];
+}
+
+class _StudentHome extends StatefulWidget {
   const _StudentHome();
 
-  Future<_StudentHomeData> _load(BuildContext context) async {
+  @override
+  State<_StudentHome> createState() => _StudentHomeState();
+}
+
+class _StudentHomeState extends State<_StudentHome> {
+  String? _semester;
+
+  Future<_StudentHomeData> _load() async {
     final api = context.read<ApiClient>();
     final auth = context.read<AuthController>();
     final now = DateTime.now();
@@ -51,131 +83,238 @@ class _StudentHome extends StatelessWidget {
       api.get('/students/me/attendance'),
       auth.reloadMe(),
     ]);
-    final today = (results[0] as List<dynamic>)
-        .map((e) => WeekSlot.fromJson(e as Json))
-        .where((slot) => dateOnly(slot.date) == dateOnly(now))
-        .toList();
+    final week = (results[0] as List<dynamic>).map((e) => WeekSlot.fromJson(e as Json)).toList();
+    final today = week.where((slot) => dateOnly(slot.date) == dateOnly(now)).toList();
     final attendance = (results[1] as List<dynamic>).map((e) => ClassAttendance.fromJson(e as Json)).toList();
-    return _StudentHomeData(today, attendance);
+    return _StudentHomeData(week, today, attendance);
+  }
+
+  Widget _todayCard(BuildContext context, List<WeekSlot> today) {
+    return SectionCard(
+      title: 'Hôm nay (${weekdayLabel(DateTime.now().weekday - 1)}, ${fmtDate(DateTime.now())})',
+      trailing: TextButton(onPressed: () => context.go('/schedule'), child: const Text('Cả tuần')),
+      child: today.isEmpty
+          ? const EmptyView(icon: Icons.free_breakfast_outlined, message: 'Hôm nay bạn không có lịch học.')
+          : Column(
+              children: [
+                for (final slot in today)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${slot.classCode} — ${slot.subjectName}'),
+                    subtitle: Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · ${roomLabel(slot.room)}'),
+                    trailing: slot.myStatus != null
+                        ? StatusChip.attendance(slot.myStatus)
+                        : slot.sessionStatus == 'open'
+                            ? FilledButton.icon(
+                                onPressed: () => context.push('/self-checkin/${slot.sessionId}', extra: selfCheckinTitle(slot)),
+                                icon: const Icon(Icons.camera_alt_outlined),
+                                label: const Text('Tự điểm danh'),
+                              )
+                            : Text(slot.sessionStatus == 'closed' ? 'Đã đóng' : 'Chưa mở phiên'),
+                  ),
+              ],
+            ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return AsyncLoader<_StudentHomeData>(
-      load: () => _load(context),
+      load: _load,
       builder: (context, data, reload) {
         final me = context.watch<AuthController>().me!;
-        final warnings = data.attendance.where((c) => c.warning).toList();
+        final wide = isWideScreen(context);
+        final semesters = {for (final c in data.attendance) c.semester}.toList()..sort((a, b) => b.compareTo(a));
+        final semester = semesters.contains(_semester) ? _semester : (semesters.isEmpty ? null : semesters.first);
+        final classes = data.attendance.where((c) => c.semester == semester).toList();
+        final warned = classes.where((c) => c.warning).length;
+        final reminders = studentReminders(me, data.attendance);
+
+        final profile = ProfileCard(
+          title: 'Thông tin sinh viên',
+          name: me.fullName,
+          onDetail: () => context.go('/account'),
+          fields: [
+            if (me.studentCode != null) ('MSSV', me.studentCode!),
+            ('Họ tên', me.fullName),
+            if (me.facultyName != null) ('Khoa', me.facultyName!),
+            if (me.major != null && me.major!.isNotEmpty) ('Ngành', me.major!),
+            if (me.cohort != null) ('Khoá', 'K${me.cohort}'),
+            ('Email', me.email),
+          ],
+          footer: StatusChip(label: faceStatusLabel(me.faceStatus), color: statusColor(me.faceStatus == 'none' ? null : me.faceStatus)),
+        );
+        final tiles = TileColumn(
+          top: DashTile(
+            label: 'Nhắc nhở',
+            value: '${reminders.length}',
+            icon: Icons.notifications_none,
+            note: reminders.isEmpty ? 'Không có việc cần xử lý' : reminders.first.$1,
+            onTap: reminders.isEmpty ? null : () => context.go(reminders.first.$2),
+          ),
+          left: DashTile(
+            label: 'Lịch học trong tuần',
+            value: '${data.week.length}',
+            icon: Icons.calendar_month_outlined,
+            tone: TileTone.blue,
+            onTap: () => context.go('/schedule'),
+          ),
+          right: DashTile(
+            label: 'Lớp cảnh báo vắng',
+            value: '$warned',
+            icon: Icons.warning_amber_rounded,
+            tone: TileTone.amber,
+            onTap: () => context.go('/my-attendance'),
+          ),
+        );
+        final today = _todayCard(context, data.today);
+        final dropdown = semesters.length < 2
+            ? null
+            : SemesterDropdown(
+                value: semester,
+                options: semesters,
+                allowLatest: false,
+                width: 200,
+                onChanged: (value) => setState(() => _semester = value),
+              );
+        final done = classes.fold<int>(0, (sum, c) => sum + c.totalSessions - c.absent);
+        final total = classes.fold<int>(0, (sum, c) => sum + c.totalSessions);
+        final charts = CardRow(
+          flexes: const [5, 3, 4],
+          children: [
+            SectionCard(title: 'Chuyên cần theo lớp', trailing: dropdown, child: _ClassBars(classes: classes)),
+            SectionCard(title: 'Tiến độ chuyên cần', child: Center(child: ProgressRing(done: done, total: total))),
+            SectionCard(title: 'Lớp học phần', child: _ClassTable(classes: classes)),
+          ],
+        );
+        const gap = SizedBox(height: kCardGap);
+
+        // Dien thoai: "Hom nay" len tren vi tu diem danh la viec chinh; bo hang loi tat vi da
+        // co thanh dieu huong duoi.
         return PageBody(
           onRefresh: reload,
-          children: [
-            SectionCard(
+          children: wide
+              ? [
+                  CardRow(flexes: const [7, 5], children: [profile, tiles]),
+                  gap,
+                  ShortcutGrid(items: shortcutsFor(me.role)),
+                  gap,
+                  today,
+                  gap,
+                  charts,
+                ]
+              : [profile, gap, today, gap, tiles, gap, charts],
+        );
+      },
+    );
+  }
+}
+
+/// Bieu do ti le di hoc cua tung lop; lop vuot nguong vang to do.
+class _ClassBars extends StatelessWidget {
+  const _ClassBars({required this.classes});
+
+  final List<ClassAttendance> classes;
+
+  @override
+  Widget build(BuildContext context) {
+    if (classes.isEmpty) return const SizedBox(height: 230, child: Center(child: Text('Chưa có dữ liệu')));
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return SizedBox(
+      height: 230,
+      child: BarChart(BarChartData(
+        maxY: 100,
+        minY: 0,
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            getTooltipItem: (group, groupIndex, rod, rodIndex) => BarTooltipItem(
+              '${classes[group.x].subjectName}\n${rod.toY.toStringAsFixed(0)}% đi học',
+              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        gridData: const FlGridData(drawVerticalLine: false, horizontalInterval: 25),
+        borderData: FlBorderData(show: false),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              interval: 25,
+              getTitlesWidget: (value, meta) => SideTitleWidget(meta: meta, child: Text('${value.toInt()}%', style: TextStyle(fontSize: 11, color: muted))),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              getTitlesWidget: (value, meta) => SideTitleWidget(
+                meta: meta,
+                child: Text(classes[value.toInt()].classCode, style: TextStyle(fontSize: 11, color: muted), overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ),
+        ),
+        barGroups: [
+          for (var i = 0; i < classes.length; i++)
+            BarChartGroupData(x: i, barRods: [
+              BarChartRodData(
+                toY: (1 - classes[i].absentRatio) * 100,
+                width: 20,
+                color: classes[i].warning ? AppColors.danger : AppColors.success,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+              ),
+            ]),
+        ],
+      )),
+    );
+  }
+}
+
+class _ClassTable extends StatelessWidget {
+  const _ClassTable({required this.classes});
+
+  final List<ClassAttendance> classes;
+
+  @override
+  Widget build(BuildContext context) {
+    if (classes.isEmpty) return const Text('Chưa có lớp học phần.');
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: [
+            Expanded(child: Text('Môn học/học phần', style: TextStyle(color: muted, fontSize: 13))),
+            Text('Vắng', style: TextStyle(color: muted, fontSize: 13)),
+          ]),
+        ),
+        for (final c in classes)
+          InkWell(
+            onTap: () => context.go('/my-attendance'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant))),
               child: Row(
                 children: [
-                  CircleAvatar(radius: 26, child: Text(me.fullName.isEmpty ? '?' : me.fullName.trim().split(' ').last[0])),
-                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Xin chào, ${me.fullName}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                        Text([me.studentCode, me.facultyName].whereType<String>().join(' · ')),
-                        const SizedBox(height: 6),
-                        StatusChip(
-                          label: faceStatusLabel(me.faceStatus),
-                          color: statusColor(me.faceStatus == 'none' ? null : me.faceStatus),
-                        ),
+                        Text(c.classCode, style: const TextStyle(color: AppColors.link, fontSize: 13)),
+                        Text(c.subjectName, style: const TextStyle(fontSize: 13)),
                       ],
                     ),
                   ),
-                  if (me.faceStatus != 'approved')
-                    FilledButton.tonal(onPressed: () => context.go('/face'), child: const Text('Đăng ký khuôn mặt')),
+                  Text('${c.absent}/${c.totalSessions}', style: TextStyle(fontSize: 13, color: c.warning ? AppColors.danger : null)),
                 ],
               ),
             ),
-            if (me.consentGiven == true && me.consentOutdated) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: AppColors.warning.withValues(alpha: 0.12),
-                child: ListTile(
-                  leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.warning),
-                  title: const Text('Nội dung đồng ý sử dụng dữ liệu khuôn mặt đã cập nhật'),
-                  subtitle: const Text('Vui lòng đọc lại và xác nhận.'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/face'),
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            SectionCard(
-              title: 'Hôm nay (${weekdayLabel(DateTime.now().weekday - 1)}, ${fmtDate(DateTime.now())})',
-              trailing: TextButton(onPressed: () => context.go('/schedule'), child: const Text('Cả tuần')),
-              child: data.today.isEmpty
-                  ? const EmptyView(icon: Icons.free_breakfast_outlined, message: 'Hôm nay bạn không có lịch học.')
-                  : Column(
-                      children: [
-                        for (final slot in data.today)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('${slot.classCode} — ${slot.subjectName}'),
-                            subtitle: Text('${hhmm(slot.startTime)}–${hhmm(slot.endTime)} · ${roomLabel(slot.room)}'),
-                            trailing: slot.myStatus != null
-                                ? StatusChip.attendance(slot.myStatus)
-                                : slot.sessionStatus == 'open'
-                                    ? FilledButton.icon(
-                                        onPressed: () => context.push('/self-checkin/${slot.sessionId}',
-                                            extra: selfCheckinTitle(slot)),
-                                        icon: const Icon(Icons.camera_alt_outlined),
-                                        label: const Text('Tự điểm danh'),
-                                      )
-                                    : Text(slot.sessionStatus == 'closed' ? 'Đã đóng' : 'Chưa mở phiên'),
-                          ),
-                      ],
-                    ),
-            ),
-            const SizedBox(height: 16),
-            SectionCard(
-              title: 'Chuyên cần học kỳ',
-              trailing: TextButton(onPressed: () => context.go('/my-attendance'), child: const Text('Chi tiết')),
-              child: data.attendance.isEmpty
-                  ? const Text('Chưa có dữ liệu chuyên cần.')
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (warnings.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: StatusChip(
-                              icon: Icons.warning_amber_rounded,
-                              label: '${warnings.length} lớp vượt ngưỡng vắng — nguy cơ cấm thi',
-                              color: AppColors.danger,
-                            ),
-                          ),
-                        for (final c in data.attendance)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('${c.classCode} — ${c.subjectName}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                                const SizedBox(height: 4),
-                                LinearProgressIndicator(
-                                  value: c.warnRatio == 0 ? 0 : (c.absentRatio / c.warnRatio).clamp(0, 1),
-                                  color: c.warning ? AppColors.danger : AppColors.success,
-                                  minHeight: 6,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                const SizedBox(height: 2),
-                                Text('Vắng ${c.absent}/${c.totalSessions} buổi (${percent(c.absentRatio)})', style: const TextStyle(fontSize: 12.5)),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-            ),
-          ],
-        );
-      },
+          ),
+      ],
     );
   }
 }
@@ -262,43 +401,94 @@ class _LecturerHomeState extends State<_LecturerHome> {
       load: _load,
       builder: (context, data, reload) {
         final me = context.watch<AuthController>().me!;
+        final wide = isWideScreen(context);
+        final profile = ProfileCard(
+          title: 'Thông tin giảng viên',
+          name: me.fullName,
+          onDetail: () => context.go('/account'),
+          fields: [
+            if (me.lecturerCode != null) ('Mã giảng viên', me.lecturerCode!),
+            ('Họ tên', me.fullName),
+            if (me.facultyName != null) ('Khoa', me.facultyName!),
+            if (me.department != null && me.department!.isNotEmpty) ('Bộ môn', me.department!),
+            ('Email', me.email),
+          ],
+        );
+        final tiles = TileColumn(
+          top: DashTile(
+            label: 'Phiên đang mở',
+            value: '${data.openSessions.length}',
+            icon: Icons.how_to_reg_outlined,
+            onTap: () => context.go('/sessions'),
+          ),
+          left: DashTile(
+            label: 'Buổi dạy hôm nay',
+            value: '${data.today.length}',
+            icon: Icons.event_available_outlined,
+            tone: TileTone.blue,
+            onTap: () => context.go('/schedule'),
+          ),
+          right: DashTile(
+            label: 'SV vượt ngưỡng vắng',
+            value: '${data.warnedStudents}',
+            icon: Icons.warning_amber_rounded,
+            tone: TileTone.amber,
+            onTap: () => context.go('/reports'),
+          ),
+        );
+        final today = SectionCard(
+          title: 'Lịch dạy hôm nay',
+          child: data.today.isEmpty
+              ? const EmptyView(icon: Icons.free_breakfast_outlined, message: 'Hôm nay không có lịch dạy.')
+              : Column(
+                  children: [
+                    for (final s in data.today)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${s.classCode} — ${s.subjectName}'),
+                        subtitle: Text('${hhmm(s.startTime)}–${hhmm(s.endTime)} · ${roomLabel(s.room)}'),
+                        trailing: _action(s),
+                      ),
+                  ],
+                ),
+        );
+        final classes = SectionCard(
+          title: 'Lớp học phần',
+          child: me.classes.isEmpty
+              ? const Text('Chưa được phân công lớp nào.')
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final c in me.classes)
+                      InkWell(
+                        onTap: () => context.push('/classes/${c.id}'),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant))),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c.classCode, style: const TextStyle(color: AppColors.link, fontSize: 13)),
+                              Text(c.subjectName, style: const TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+        );
+        const gap = SizedBox(height: kCardGap);
         return PageBody(
           onRefresh: reload,
-          children: [
-            Text('Xin chào, ${me.fullName}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-            Text([me.lecturerCode, me.facultyName].whereType<String>().join(' · ')),
-            const SizedBox(height: 16),
-            ResponsiveGrid(
-              children: [
-                StatCard(label: 'Buổi dạy hôm nay', value: '${data.today.length}', icon: Icons.event_available_outlined, onTap: () => context.go('/schedule')),
-                StatCard(label: 'Phiên đang mở', value: '${data.openSessions.length}', icon: Icons.how_to_reg_outlined, onTap: () => context.go('/sessions')),
-                StatCard(
-                  label: 'SV vượt ngưỡng vắng',
-                  value: '${data.warnedStudents}',
-                  icon: Icons.warning_amber_rounded,
-                  color: data.warnedStudents > 0 ? AppColors.danger : AppColors.success,
-                  onTap: () => context.go('/reports'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SectionCard(
-              title: 'Lịch dạy hôm nay',
-              child: data.today.isEmpty
-                  ? const EmptyView(icon: Icons.free_breakfast_outlined, message: 'Hôm nay không có lịch dạy.')
-                  : Column(
-                      children: [
-                        for (final s in data.today)
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text('${s.classCode} — ${s.subjectName}'),
-                            subtitle: Text('${hhmm(s.startTime)}–${hhmm(s.endTime)} · ${roomLabel(s.room)}'),
-                            trailing: _action(s),
-                          ),
-                      ],
-                    ),
-            ),
-          ],
+          children: wide
+              ? [
+                  CardRow(flexes: const [7, 5], children: [profile, tiles]),
+                  gap,
+                  ShortcutGrid(items: shortcutsFor(me.role)),
+                  gap,
+                  CardRow(flexes: const [7, 5], children: [today, classes]),
+                ]
+              : [profile, gap, today, gap, tiles, gap, classes],
         );
       },
     );
