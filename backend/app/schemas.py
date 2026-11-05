@@ -46,6 +46,18 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
+class ManagerResetPasswordRequest(BaseModel):
+    """Can bo dat lai mat khau cho nguoi khac - khong can mat khau hien tai cua nguoi do."""
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Mat khau moi phai co it nhat 8 ky tu")
+        return v
+
+
 class ChangePasswordRequest(BaseModel):
     """Nguoi dang dang nhap tu doi mat khau - bat buoc nhap dung mat khau hien tai."""
     current_password: str

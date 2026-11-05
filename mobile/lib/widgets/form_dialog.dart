@@ -11,6 +11,7 @@ class FieldSpec {
     this.options = const [],
     this.helper,
     this.minLength,
+    this.sameAs,
   });
 
   final String key;
@@ -22,6 +23,9 @@ class FieldSpec {
   final List<(Object?, String)> options;
   final String? helper;
   final int? minLength;
+
+  /// Khoa cua truong phai nhap giong het (nhap lai mat khau).
+  final String? sameAs;
 }
 
 /// Hop thoai form tao/sua ban ghi. Tra ve map gia tri (kieu: String/int/Object?) hoac null neu huy.
@@ -132,6 +136,7 @@ class _FormDialogState extends State<_FormDialog> {
         if (f.kind == FieldKind.email && !v.contains('@')) return 'Email không hợp lệ';
         if (f.kind == FieldKind.number && int.tryParse(v) == null) return 'Phải là số';
         if (f.minLength != null && v.length < f.minLength!) return 'Tối thiểu ${f.minLength} ký tự';
+        if (f.sameAs != null && v != _text[f.sameAs]!.text.trim()) return 'Hai lần nhập không khớp';
         return null;
       },
     );

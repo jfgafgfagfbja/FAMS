@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.auth import reset_password_by_manager
 from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
                                  student_out)
 from app.core.authz import (STUDENT_MANAGERS, ensure_student_view, filter_students,
@@ -253,6 +254,17 @@ def delete_student(
     db.delete(student)
     db.delete(user)
     db.commit()
+    return {"ok": True}
+
+
+@router.post("/{student_id}/reset-password")
+def reset_student_password(
+    student_id: int,
+    body: schemas.ManagerResetPasswordRequest,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(*STUDENT_MANAGERS)),
+):
+    reset_password_by_manager(db, _get_student_or_404(db, student_id).user, body.new_password)
     return {"ok": True}
 
 

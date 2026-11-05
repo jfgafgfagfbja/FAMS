@@ -3,6 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.auth import reset_password_by_manager
 from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
                                  ensure_no_audit_history, staff_out)
 from app.core.security import hash_password, require_roles
@@ -108,6 +109,20 @@ def update_staff(
     db.commit()
     db.refresh(staff)
     return staff_out(staff)
+
+
+@router.post("/{staff_id}/reset-password")
+def reset_staff_password(
+    staff_id: int,
+    body: schemas.ManagerResetPasswordRequest,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(ROLE_ADMIN)),
+):
+    staff = db.get(models.Staff, staff_id)
+    if not staff:
+        raise HTTPException(404, "Can bo khong ton tai")
+    reset_password_by_manager(db, staff.user, body.new_password)
+    return {"ok": True}
 
 
 @router.delete("/{staff_id}")

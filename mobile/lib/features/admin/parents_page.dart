@@ -8,6 +8,7 @@ import '../../models/models.dart';
 import '../../widgets/common.dart';
 import '../../widgets/form_dialog.dart';
 import '../../widgets/paged_list.dart';
+import '../../widgets/reset_password.dart';
 
 class ParentsPage extends StatelessWidget {
   const ParentsPage({super.key});
@@ -132,6 +133,8 @@ class ParentsPage extends StatelessWidget {
                     onSelected: (value) async {
                       if (value == 'edit') {
                         if (await _edit(context, parent: p)) reload();
+                      } else if (value == 'password') {
+                        await resetPassword(context, name: p.fullName, path: '/parents/${p.id}/reset-password');
                       } else {
                         final ok = await confirmDialog(context,
                             title: 'Xóa phụ huynh?', message: 'Xóa tài khoản ${p.fullName} và các liên kết với con?', confirmLabel: 'Xóa', destructive: true);
@@ -142,6 +145,7 @@ class ParentsPage extends StatelessWidget {
                     },
                     itemBuilder: (context) => const [
                       PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                      PopupMenuItem(value: 'password', child: Text('Đặt lại mật khẩu')),
                       PopupMenuItem(value: 'delete', child: Text('Xóa')),
                     ],
                   )

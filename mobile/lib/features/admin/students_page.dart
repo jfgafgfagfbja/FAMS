@@ -11,6 +11,7 @@ import '../../widgets/common.dart';
 import '../../widgets/form_dialog.dart';
 import '../../widgets/paged_list.dart';
 import '../../widgets/pickers.dart';
+import '../../widgets/reset_password.dart';
 
 /// Tai danh sach Khoa lam lua chon dropdown trong form.
 Future<List<(Object?, String)>> facultyOptions(ApiClient api, {bool allowNone = true}) async {
@@ -113,6 +114,8 @@ class _StudentsPageState extends State<StudentsPage> {
                         if (await editStudent(context, student: s)) reload();
                       } else if (value == 'face') {
                         context.push('/enroll-face/${s.id}');
+                      } else if (value == 'password') {
+                        await resetPassword(context, name: s.fullName, path: '/students/${s.id}/reset-password');
                       } else if (value == 'delete') {
                         final ok = await confirmDialog(context,
                             title: 'Xóa sinh viên?', message: 'Xóa ${s.fullName} (${s.studentCode})?', confirmLabel: 'Xóa', destructive: true);
@@ -124,6 +127,7 @@ class _StudentsPageState extends State<StudentsPage> {
                     itemBuilder: (context) => const [
                       PopupMenuItem(value: 'edit', child: Text('Sửa')),
                       PopupMenuItem(value: 'face', child: Text('Đăng ký khuôn mặt hộ')),
+                      PopupMenuItem(value: 'password', child: Text('Đặt lại mật khẩu')),
                       PopupMenuItem(value: 'delete', child: Text('Xóa')),
                     ],
                   ),

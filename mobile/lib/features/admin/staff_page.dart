@@ -9,6 +9,7 @@ import '../../widgets/common.dart';
 import '../../widgets/form_dialog.dart';
 import '../../widgets/paged_list.dart';
 import '../../widgets/pickers.dart';
+import '../../widgets/reset_password.dart';
 
 /// Tai khoan can bo Phong Dao tao, Phong CTSV, Khoa (Van phong / Lanh dao), Ban nganh - chi admin.
 class StaffPage extends StatefulWidget {
@@ -101,6 +102,8 @@ class _StaffPageState extends State<StaffPage> {
               onSelected: (value) async {
                 if (value == 'edit') {
                   if (await _edit(context, staff: s)) reload();
+                } else if (value == 'password') {
+                  await resetPassword(context, name: s.fullName, path: '/staff/${s.id}/reset-password');
                 } else {
                   final ok = await confirmDialog(context, title: 'Xóa cán bộ?', message: 'Xóa tài khoản ${s.fullName}?', confirmLabel: 'Xóa', destructive: true);
                   if (ok && context.mounted && await runAction(context, () => api.delete('/staff/${s.id}'), success: 'Đã xóa')) {
@@ -110,6 +113,7 @@ class _StaffPageState extends State<StaffPage> {
               },
               itemBuilder: (context) => const [
                 PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                PopupMenuItem(value: 'password', child: Text('Đặt lại mật khẩu')),
                 PopupMenuItem(value: 'delete', child: Text('Xóa')),
               ],
             ),

@@ -8,6 +8,7 @@ import '../../models/models.dart';
 import '../../widgets/common.dart';
 import '../../widgets/form_dialog.dart';
 import '../../widgets/paged_list.dart';
+import '../../widgets/reset_password.dart';
 import '../../widgets/pickers.dart';
 import 'students_page.dart';
 
@@ -89,6 +90,8 @@ class _LecturersPageState extends State<LecturersPage> {
                     onSelected: (value) async {
                       if (value == 'edit') {
                         if (await _edit(context, lecturer: l)) reload();
+                      } else if (value == 'password') {
+                        await resetPassword(context, name: l.fullName, path: '/lecturers/${l.id}/reset-password');
                       } else {
                         final ok = await confirmDialog(context,
                             title: 'Xóa giảng viên?', message: 'Xóa ${l.fullName}?', confirmLabel: 'Xóa', destructive: true);
@@ -97,9 +100,10 @@ class _LecturersPageState extends State<LecturersPage> {
                         }
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Sửa')),
-                      PopupMenuItem(value: 'delete', child: Text('Xóa')),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Sửa')),
+                      if (perms.resetStaffPassword) const PopupMenuItem(value: 'password', child: Text('Đặt lại mật khẩu')),
+                      const PopupMenuItem(value: 'delete', child: Text('Xóa')),
                     ],
                   )
                 : null,

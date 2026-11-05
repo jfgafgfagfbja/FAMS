@@ -38,6 +38,7 @@ class Roles {
   static List<String> duties(String role) => switch (role) {
         admin => const [
             'Quản lý tài khoản cán bộ, đơn vị và toàn bộ danh mục',
+            'Đặt lại mật khẩu cho mọi tài khoản',
             'Mở phiên, sửa kết quả điểm danh mọi lớp',
             'Xem nhật ký hệ thống toàn trường',
           ],
@@ -48,6 +49,7 @@ class Roles {
           ],
         affairs => const [
             'Hồ sơ sinh viên, phụ huynh, ghi nhận đồng ý sinh trắc học',
+            'Đặt lại mật khẩu cho sinh viên, phụ huynh',
             'Duyệt ảnh khuôn mặt sinh viên',
             'Duyệt vắng có phép toàn trường',
             'Xem điểm danh, báo cáo, cảnh báo vắng toàn trường',
@@ -104,6 +106,10 @@ class Perms {
       _in(const [Roles.admin, Roles.training, Roles.affairs, ...Roles.facultyRoles, Roles.board]);
   bool get reviewFaces => manageStudents;
   bool get manageUnits => role == Roles.admin;
+
+  /// Dat lai mat khau cho nguoi khac: admin moi tai khoan, P.CTSV cho SV va phu huynh.
+  bool get resetStudentPassword => manageStudents;
+  bool get resetStaffPassword => role == Roles.admin;
 
   /// Nhat ky he thong: admin toan truong, Lanh dao Khoa trong Khoa minh.
   bool get viewAuditLog => _in(const [Roles.admin, Roles.facultyLeader]);

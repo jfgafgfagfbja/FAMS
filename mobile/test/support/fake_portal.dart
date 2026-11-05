@@ -16,6 +16,12 @@ class FakeApi extends ApiClient {
 
   final String role;
 
+  /// Du lieu cac trang danh sach, theo duong dan API.
+  Map<String, List<Json>> pages = {};
+
+  /// Cac lan goi POST da nhan: (duong dan, noi dung).
+  final posts = <(String, Object?)>[];
+
   Json get me => {
         'id': 1,
         'email': 'nguoi.dung@fams.edu.vn',
@@ -136,21 +142,30 @@ class FakeApi extends ApiClient {
   }
 
   @override
-  Future<PageResult<Map<String, dynamic>>> getPage(String path, {Map<String, dynamic>? query}) async => const PageResult([], 0);
+  Future<PageResult<Map<String, dynamic>>> getPage(String path, {Map<String, dynamic>? query}) async {
+    final items = pages[path] ?? const <Json>[];
+    return PageResult(items, items.length);
+  }
+
+  @override
+  Future<dynamic> post(String path, {Object? data}) async {
+    posts.add((path, data));
+    return {'ok': true};
+  }
 }
 
 /// Mo ung dung that (router, khung, trang chu) voi tai khoan [role] o co man hinh [size].
-Future<void> openApp(WidgetTester tester, String role, Size size, {ThemeData? theme}) async {
+Future<void> openApp(WidgetTester tester, String role, Size size, {ThemeData? theme, FakeApi? api}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final api = FakeApi(role);
-  final auth = AuthController(api)
-    ..me = Me.fromJson(api.me)
+  final client = api ?? FakeApi(role);
+  final auth = AuthController(client)
+    ..me = Me.fromJson(client.me)
     ..status = AuthStatus.authenticated;
   await tester.pumpWidget(MultiProvider(
     providers: [
-      Provider<ApiClient>.value(value: api),
+      Provider<ApiClient>.value(value: client),
       ChangeNotifierProvider<AuthController>.value(value: auth),
       ChangeNotifierProvider<ThemeController>(create: (_) => ThemeController(TokenStorage())),
     ],

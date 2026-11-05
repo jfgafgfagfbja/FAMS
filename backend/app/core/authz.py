@@ -4,6 +4,8 @@ Ma tran quyen (Sua = tao/sua/xoa, Xem = chi doc, Duyet = phe duyet, * = chi tron
 
   Chuc nang                  Admin  P.DaoTao  P.CTSV  LanhDaoKhoa  VanPhongKhoa  BanNganh
   Tai khoan can bo, don vi   Sua    -         -       -            -             -
+  Dat lai MK GV, can bo      Sua    -         -       -            -             -
+  Dat lai MK SV, phu huynh   Sua    -         Sua     -            -             -
   Lop HP, lich, ghi danh,
     phan cong GV day lop     Sua    Sua       Xem     Xem*         Sua*          -
   Phong hoc, dia diem        Sua    Sua       Xem     Xem          Xem           -

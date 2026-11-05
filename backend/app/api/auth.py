@@ -56,6 +56,21 @@ def _record_failure(key: str) -> None:
     _failed_logins.setdefault(key, []).append(time.monotonic())
 
 
+def reset_password_by_manager(db: Session, user: models.User, new_password: str) -> None:
+    """Can bo dat lai mat khau cho nguoi khac, khi nguoi do quen mat khau ma khong nhan duoc
+    email OTP. Nhu moi lan doi mat khau, thu hoi toan bo phien dang dang nhap; them vao do huy
+    OTP con hieu luc va mo khoa neu tai khoan dang bi khoa vi nhap sai. Nhat ky do listener
+    trong services/audit.py tu ghi, chi ghi la da thay doi, khong ghi gia tri."""
+    user.password_hash = hash_password(new_password)
+    user.credentials_changed_at = datetime.utcnow()
+    user.token_version = (user.token_version or 0) + 1
+    revoke_all_refresh_tokens(db, user.id)
+    db.query(models.PasswordReset).filter_by(user_id=user.id, used=False).update({"used": True})
+    _failed_logins.pop(user.email.strip().lower(), None)
+    _failed_logins.pop(f"change-password:{user.id}", None)
+    db.commit()
+
+
 def _issue_tokens(db: Session, user: models.User) -> schemas.Token:
     return schemas.Token(
         access_token=create_access_token(user.id, user.role, user.token_version), role=user.role,

@@ -11,6 +11,7 @@ import '../../models/models.dart';
 import '../../widgets/attendance_views.dart';
 import '../../widgets/common.dart';
 import '../../widgets/pickers.dart';
+import '../../widgets/reset_password.dart';
 import 'students_page.dart';
 
 /// Ho so + chuyen can chi tiet 1 SV cho can bo; P.CTSV/Khoa/admin duyet co phep tai day.
@@ -75,6 +76,11 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                     onPressed: () => context.push('/enroll-face/${student.id}'),
                     icon: const Icon(Icons.add_a_photo_outlined),
                     label: Text(student.consentGiven ? 'Đăng ký khuôn mặt hộ' : 'Ghi nhận đồng ý / đăng ký khuôn mặt'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => resetPassword(context, name: student.fullName, path: '/students/${student.id}/reset-password'),
+                    icon: const Icon(Icons.lock_reset),
+                    label: const Text('Đặt lại mật khẩu'),
                   ),
                   if (student.consentGiven)
                     OutlinedButton.icon(

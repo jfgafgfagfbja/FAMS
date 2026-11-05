@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app import schemas
+from app.api.auth import reset_password_by_manager
 from app.api.schedules import open_from_time
 from app.api.serializers import (delete_user_auth_rows, ensure_email_available,
                                  ensure_no_audit_history, lecturer_out)
@@ -96,6 +97,17 @@ def update_lecturer(
     db.commit()
     db.refresh(lecturer)
     return lecturer_out(lecturer)
+
+
+@router.post("/{lecturer_id}/reset-password")
+def reset_lecturer_password(
+    lecturer_id: int,
+    body: schemas.ManagerResetPasswordRequest,
+    db: Session = Depends(get_db),
+    _user: models.User = Depends(require_roles(ROLE_ADMIN)),
+):
+    reset_password_by_manager(db, _get_lecturer_or_404(db, lecturer_id).user, body.new_password)
+    return {"ok": True}
 
 
 @router.delete("/{lecturer_id}")
