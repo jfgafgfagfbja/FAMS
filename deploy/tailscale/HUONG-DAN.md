@@ -90,6 +90,7 @@ Máy ngủ là link chết.
 | `LOI: Chua co CSDL fams_public` | Cơ sở dữ liệu công khai bị xóa (ví dụ do `docker compose down -v`). Nạp lại từ `D:\fams-trien-khai\fams_public.sql` |
 | `LOI: Ban cong khai khong khoi dong duoc` | Mở tệp `D:\fams-trien-khai\fams_public.err.log` xem dòng cuối |
 | Link mở ra báo không kết nối được | Máy đang tắt/ngủ, hoặc chưa bấm `bat-fams-cong-khai.cmd` |
+| **Máy tính vào được, điện thoại thì không** | Tên miền chưa lên DNS công khai — máy này luôn vào được qua mạng nội bộ của Tailscale nên không tự thấy lỗi. Cửa sổ bật link sẽ in dòng `CANH BAO: DNS cong khai CHUA co...`. Chờ 10 phút; vẫn vậy thì bấm tắt rồi bật lại và chờ thêm 10 phút. Trên điện thoại, bật/tắt chế độ máy bay để xóa kết quả cũ |
 | Đăng nhập báo sai mật khẩu | Đang dùng mật khẩu bản phát triển — bản công khai dùng mật khẩu trong CSV |
 
 ## Những điều nên biết

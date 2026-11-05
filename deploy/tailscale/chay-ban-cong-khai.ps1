@@ -158,8 +158,24 @@ if ($LASTEXITCODE -ne 0) { Loi 'Khong bat duoc Funnel - xem thong bao phia tren'
 $self = (& $Tailscale status --json | ConvertFrom-Json).Self
 $url  = 'https://' + $self.DNSName.TrimEnd('.')
 
+# May nay luon vao duoc link qua mang noi bo cua Tailscale, ke ca khi nguoi ngoai khong vao
+# duoc - nen phai hoi DNS cong khai (qua HTTPS de Tailscale tren may khong chan giua) moi biet
+# dien thoai o ngoai co tim thay ten mien hay khong.
+$publicDns = $null
+try {
+    $answer = Invoke-RestMethod "https://dns.google/resolve?name=$($self.DNSName.TrimEnd('.'))&type=A" -TimeoutSec 10
+    $publicDns = @($answer.Answer | Where-Object { $_.type -eq 1 } | ForEach-Object { $_.data })
+} catch { }
+
 Write-Host ''
 Write-Host '================================================================' -ForegroundColor Green
 Write-Host " LINK CONG KHAI: $url" -ForegroundColor Green
 Write-Host '================================================================' -ForegroundColor Green
+if ($publicDns -and $publicDns.Count -gt 0) {
+    Write-Host "Nguoi ngoai vao duoc: DNS cong khai da tro ve $($publicDns -join ', ')" -ForegroundColor Green
+} else {
+    Write-Host 'CANH BAO: DNS cong khai CHUA co ten mien nay - may tinh nay vao duoc nhung dien thoai' -ForegroundColor Yellow
+    Write-Host 'va nguoi ngoai THI CHUA. Thuong mat toi 10 phut sau khi bat. Qua 10 phut van vay thi' -ForegroundColor Yellow
+    Write-Host 'bam tat-fams-cong-khai.cmd roi bat lai, cho them 10 phut.' -ForegroundColor Yellow
+}
 Write-Host 'Link chi song khi may nay bat va dang chay. Tat: tat-fams-cong-khai.cmd'

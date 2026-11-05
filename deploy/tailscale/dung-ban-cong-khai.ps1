@@ -9,7 +9,9 @@ if (-not $Tailscale) { $Tailscale = Join-Path $env:ProgramFiles 'Tailscale\tails
 
 if ($Tailscale -and (Test-Path $Tailscale)) {
     Write-Host '-> Dong link Internet' -ForegroundColor Cyan
-    & $Tailscale funnel reset
+    # Tat rieng Funnel o cong 443 thay vi "funnel reset": sau mot lan reset roi bat lai,
+    # ban ghi DNS cong khai da tung khong duoc tao lai (may tinh vao duoc, dien thoai thi khong).
+    & $Tailscale funnel --https=443 off
 }
 
 $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
