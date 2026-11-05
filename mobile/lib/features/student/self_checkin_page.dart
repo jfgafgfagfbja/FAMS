@@ -15,10 +15,13 @@ import '../../widgets/qr_scanner.dart';
 /// SV tu chup selfie diem danh: xin vi tri (co the tu choi), chup, gui len backend -
 /// backend chi so khop voi khuon mat cua CHINH SV dang dang nhap.
 class SelfCheckinPage extends StatefulWidget {
-  const SelfCheckinPage({super.key, required this.sessionId, this.title});
+  const SelfCheckinPage({super.key, required this.sessionId, this.title, this.initialCode});
 
   final int sessionId;
   final String? title;
+
+  /// Ma lay san tu link trong anh QR.
+  final String? initialCode;
 
   @override
   State<SelfCheckinPage> createState() => _SelfCheckinPageState();
@@ -37,8 +40,8 @@ class _SelfCheckinPageState extends State<SelfCheckinPage>
   _GeoState _geoState = _GeoState.loading;
   Position? _position;
   /// Buoi nay co bat buoc quet ma QR khong (hoi backend luc mo man hinh).
-  bool _requireQr = false;
-  String? _scannedCode;
+  late bool _requireQr = widget.initialCode != null;
+  late String? _scannedCode = widget.initialCode;
   Uint8List? _shot;
   bool _submitting = false;
   SelfCheckinResult? _result;
@@ -64,8 +67,15 @@ class _SelfCheckinPageState extends State<SelfCheckinPage>
   }
 
   Future<void> _scanCode() async {
+    // Dien thoai thuong khong mo duoc hai camera cung luc: nha camera chup mat cho may quet ma.
+    await _camera.suspend();
+    if (!mounted) return;
     final code = await scanCheckinCode(context);
-    if (code != null && mounted) setState(() => _scannedCode = code);
+    await _camera.resume();
+    if (!mounted) return;
+    setState(() {
+      if (code != null) _scannedCode = code;
+    });
   }
 
   @override

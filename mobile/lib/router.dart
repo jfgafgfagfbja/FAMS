@@ -65,6 +65,17 @@ const _routeRoles = <String, List<String>>{
   '/audit-logs': [Roles.admin, Roles.facultyLeader],
 };
 
+/// Trang dang nhap kem duong dan can quay lai, de mo link ma QR khi chua dang nhap thi dang
+/// nhap xong van vao dung trang tu diem danh.
+String _loginRoute(String? target) {
+  if (target == null || target == '/') return '/login';
+  return Uri(path: '/login', queryParameters: {'from': target}).toString();
+}
+
+/// Chi quay lai trang noi bo, khong nhan duong dan ngoai dua qua tham so `from`.
+bool _canReturnTo(String? target) =>
+    target != null && target.startsWith('/') && !target.startsWith('//') && !target.startsWith('/splash') && !target.startsWith('/login');
+
 bool canAccess(String role, String path) {
   for (final entry in _routeRoles.entries) {
     if (path == entry.key || path.startsWith('${entry.key}/')) {
@@ -87,13 +98,13 @@ GoRouter buildRouter(AuthController auth) {
           if (path == '/splash') return null;
           return Uri(path: '/splash', queryParameters: {'from': state.uri.toString()}).toString();
         case AuthStatus.unauthenticated:
-          return _publicPaths.contains(path) ? null : '/login';
+          if (_publicPaths.contains(path)) return null;
+          return _loginRoute(path == '/splash' ? state.uri.queryParameters['from'] : state.uri.toString());
         case AuthStatus.authenticated:
-          if (path == '/splash') {
+          if (path == '/splash' || _publicPaths.contains(path)) {
             final from = state.uri.queryParameters['from'];
-            return (from == null || from.startsWith('/splash')) ? '/' : from;
+            return _canReturnTo(from) ? from : '/';
           }
-          if (_publicPaths.contains(path)) return '/';
           return canAccess(auth.role, path) ? null : '/';
       }
     },
@@ -116,7 +127,12 @@ GoRouter buildRouter(AuthController auth) {
           GoRoute(path: '/face', builder: (context, state) => const EnrollFacePage()),
           GoRoute(
             path: '/self-checkin/:sessionId',
-            builder: (context, state) => SelfCheckinPage(sessionId: _id(state, 'sessionId'), title: state.extra as String?),
+            builder: (context, state) => SelfCheckinPage(
+              sessionId: _id(state, 'sessionId'),
+              title: state.extra as String?,
+              // Mo tu link trong anh QR: da co san ma, khong phai quet lai trong ung dung.
+              initialCode: state.uri.queryParameters['code'],
+            ),
           ),
           // Phu huynh
           GoRoute(path: '/children', builder: (context, state) => const ChildrenPage()),

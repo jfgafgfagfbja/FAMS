@@ -81,9 +81,12 @@ class _CheckinQrPageState extends State<CheckinQrPage> {
     return PageBody(
       maxWidth: 560,
       children: [
-        const Text(
-          'Chiếu màn hình này lên máy chiếu trong phòng. Sinh viên mở mục Tự điểm danh, '
-          'quét mã rồi chụp ảnh khuôn mặt.',
+        Text(
+          code.qrPayload.startsWith('http')
+              ? 'Chiếu màn hình này lên máy chiếu trong phòng. Sinh viên quét mã bằng camera điện thoại, '
+                  'hoặc mở mục Tự điểm danh và nhập mã, rồi chụp ảnh khuôn mặt.'
+              : 'Chiếu màn hình này lên máy chiếu trong phòng. Sinh viên mở mục Tự điểm danh, '
+                  'quét mã hoặc nhập mã, rồi chụp ảnh khuôn mặt.',
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
@@ -96,7 +99,7 @@ class _CheckinQrPageState extends State<CheckinQrPage> {
             ),
             child: QrImageView(
               data: code.qrPayload,
-              size: 260,
+              size: 300,
               backgroundColor: Colors.white,
               // Mo rong vung sua loi: may chieu mo hoac anh sang chenh van quet duoc.
               errorCorrectionLevel: QrErrorCorrectLevel.Q,

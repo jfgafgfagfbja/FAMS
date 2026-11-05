@@ -118,6 +118,45 @@ def test_checkin_with_typed_digits_succeeds(client, gv_headers, seed, matched_fa
     assert body["status"] == "recognized", body
 
 
+def test_qr_is_a_link_when_public_url_is_set(client, gv_headers, seed, matched_face, monkeypatch):
+    """Co dia chi cong khai: QR la link, quet bang camera thuong vao thang dung buoi."""
+    monkeypatch.setattr(settings, "APP_PUBLIC_URL", "https://fams.example.ts.net/")
+    session_id = _open_session(client, gv_headers, seed, require_qr=True)
+    payload = client.get(f"/sessions/{session_id}/checkin-code", headers=gv_headers).json()["qr_payload"]
+    assert payload.startswith(f"https://fams.example.ts.net/#/self-checkin/{session_id}?code=FAMS:")
+
+
+def test_code_taken_from_link_succeeds(client, gv_headers, seed, matched_face, monkeypatch):
+    """App lay ma tu tham so code= cua link."""
+    monkeypatch.setattr(settings, "APP_PUBLIC_URL", "https://fams.example.ts.net")
+    session_id = _open_session(client, gv_headers, seed, require_qr=True)
+    payload = client.get(f"/sessions/{session_id}/checkin-code", headers=gv_headers).json()["qr_payload"]
+    assert _checkin(client, session_id, payload.split("code=")[1]).json()["status"] == "recognized"
+
+
+def test_whole_link_scanned_inside_app_succeeds(client, gv_headers, seed, matched_face, monkeypatch):
+    """May quet trong ung dung (ke ca APK cu) gui nguyen ca link len."""
+    monkeypatch.setattr(settings, "APP_PUBLIC_URL", "https://fams.example.ts.net")
+    session_id = _open_session(client, gv_headers, seed, require_qr=True)
+    payload = client.get(f"/sessions/{session_id}/checkin-code", headers=gv_headers).json()["qr_payload"]
+    assert _checkin(client, session_id, payload).json()["status"] == "recognized"
+
+
+def test_link_of_another_session_rejected(client, gv_headers, seed, matched_face, monkeypatch):
+    monkeypatch.setattr(settings, "APP_PUBLIC_URL", "https://fams.example.ts.net")
+    session_id = _open_session(client, gv_headers, seed, require_qr=True)
+    other = checkin_code_service.current_code(session_id + 1).qr_payload
+    assert _checkin(client, session_id, other).json()["status"] == "qr_invalid"
+
+
+def test_non_ascii_code_rejected_without_crashing(client, gv_headers, seed, matched_face):
+    """compare_digest bao loi voi chuoi co dau neu so sanh dang str - khong duoc thanh loi 500."""
+    session_id = _open_session(client, gv_headers, seed, require_qr=True)
+    resp = _checkin(client, session_id, "mã-sai")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "qr_invalid"
+
+
 def test_session_without_qr_requirement_unaffected(client, gv_headers, seed, matched_face):
     session_id = _open_session(client, gv_headers, seed, require_qr=False)
     assert client.get(f"/sessions/{session_id}", headers=gv_headers).json()["require_qr"] is False

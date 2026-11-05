@@ -107,6 +107,15 @@ class _AttendanceScanPageState extends State<AttendanceScanPage>
     if (mounted) setState(() => _roster = data.map((e) => RosterEntry.fromJson(e as Json)).toList());
   }
 
+  /// Dang chieu ma thi dung quet: man hinh nay van song phia sau, webcam may giang vien se tu
+  /// ghi diem danh cho ai ngoi truoc may trong luc sinh vien dang tu quet ma.
+  Future<void> _showQr() async {
+    final wasPaused = _paused;
+    setState(() => _paused = true);
+    await context.push('/sessions/${widget.sessionId}/qr');
+    if (mounted) setState(() => _paused = wasPaused);
+  }
+
   void _restartTimer() {
     _timer?.cancel();
     if (_session?.isOpen != true) return;
@@ -236,7 +245,7 @@ class _AttendanceScanPageState extends State<AttendanceScanPage>
         ),
         if (session.requireQr)
           OutlinedButton.icon(
-            onPressed: () => context.push('/sessions/${widget.sessionId}/qr'),
+            onPressed: _showQr,
             icon: const Icon(Icons.qr_code_2),
             label: const Text('Chiếu mã QR'),
           ),
