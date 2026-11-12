@@ -2,6 +2,13 @@
 
 Hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện khuôn mặt — Trường Đại học Kiến trúc Đà Nẵng.
 
+## Báo cáo đồ án
+
+- **[Quyển báo cáo (PDF)](baocao/do-an.pdf)**
+- **[Slide bảo vệ (PDF)](baocao/slide.pdf)**
+- Mã nguồn LaTeX của báo cáo và công cụ sinh số liệu: thư mục [baocao/](baocao/), cách biên dịch ở [baocao/README.md](baocao/README.md).
+- Tài khoản mẫu để chạy thử từng vai trò: Phụ lục B của quyển báo cáo.
+
 ## Kiến trúc tóm tắt
 
 - **Backend**: FastAPI + SQLAlchemy 2.0 + PostgreSQL 16 (extension `pgvector`).
