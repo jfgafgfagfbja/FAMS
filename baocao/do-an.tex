@@ -1,0 +1,128 @@
+% !TEX program = xelatex
+% =====================================================================
+%  BÁO CÁO ĐỒ ÁN TRÍ TUỆ NHÂN TẠO, HỌC PHẦN AIP202
+%  Đề tài: FAMS — Hệ thống quản lý sinh viên tích hợp điểm danh bằng
+%          nhận diện khuôn mặt
+%  Khoa Công nghệ Thông tin, Trường Đại học Kiến trúc Đà Nẵng
+%
+%  Build:  latexmk -xelatex do-an.tex
+%  Overleaf: Menu > Compiler > XeLaTeX, Main document > do-an.tex
+%
+%  Khung tài liệu dùng lại mẫu đồ án AIP202 của Khoa CNTT (styles/dau.sty,
+%  styles/settings.tex giữ nguyên, KHÔNG sửa). Nội dung là của đồ án FAMS.
+%
+%  SỐ LIỆU TỰ ĐỘNG: file auto/du-lieu-du-an.tex do tools/quet-du-an.py
+%  sinh ra từ mã nguồn thật. Không sửa tay file đó, chạy lại script khi
+%  dự án thay đổi (xem README.md trong thư mục này).
+% =====================================================================
+\documentclass[12pt, a4paper, oneside]{book}
+\input{styles/settings}
+% Bang sinh tu dong co the dai hon mot trang: xltabular = tabularx tu ngat trang.
+\usepackage{xltabular}
+
+% Số liệu quét từ kho mã nguồn (số bảng, số endpoint, số test, ngưỡng
+% cấu hình, mã commit...). Sinh lại bằng: python tools/quet-du-an.py
+\input{auto/du-lieu-du-an}
+
+% Chỗ trống chờ số liệu đo thật hoặc ảnh chụp màn hình. In đỏ đậm để không
+% thể nộp nhầm. Tìm chuỗi "CẦN BỔ SUNG" trong PDF trước khi in quyển.
+\newcommand{\cando}[1]{{\color{daumaroon}\bfseries[CẦN BỔ SUNG: #1]}}
+
+% ---------------------------------------------------------------------
+%  Các bảng sinh tự động: nạp ở đây thành lệnh, thân bảng chỉ gọi tên lệnh.
+%  Không đặt \input bên trong tabularx, vì tabularx quét thân bảng nhiều
+%  lượt nên \input ở trong sẽ làm vỡ căn lề ("Misplaced \noalign").
+% ---------------------------------------------------------------------
+\input{auto/bang-api}            % \BangApi
+\input{auto/bang-bang-du-lieu}   % \BangDuLieu
+\input{auto/bang-cau-hinh}       % \BangCauHinh
+\input{auto/bang-test}           % \BangTest
+
+% Ba bảng số đo thật. Mặc định là các ô chờ; chạy công cụ đo xong thì tệp
+% tương ứng trong auto/ sẽ ghi đè bằng \renewcommand.
+\newcommand{\BangHieuNang}{%
+Phát hiện và trích đặc trưng một khuôn mặt & \cando{ms} & \cando{ms} \\
+Khung hình có năm khuôn mặt & \cando{ms} & \cando{ms} \\
+Truy vấn so khớp trong cơ sở dữ liệu & \cando{ms} & \cando{ms} \\
+Kiểm tra chống giả mạo một khuôn mặt & \cando{ms} & \cando{ms} \\
+Thời gian đáp ứng trọn vẹn một yêu cầu nhận diện & \cando{ms} & \cando{ms} \\
+}
+% Con so dung trong van xuoi Chuong 5. backend/tools/do_hieu_nang.py --ghi ghi de bang
+% \renewcommand trong auto/bang-hieu-nang.tex; chua do thi hien o cho.
+\newcommand{\HnMotMat}{\cando{ms}}
+\newcommand{\HnNhieuMat}{\cando{ms}}
+\newcommand{\HnSoMat}{\cando{n}}
+\newcommand{\HnMoiMatThem}{\cando{ms}}
+\newcommand{\HnTruyVan}{\cando{ms}}
+\newcommand{\HnChongGiaMao}{\cando{ms}}
+\newcommand{\HnTronVen}{\cando{ms}}
+\newcommand{\HnSoVector}{\cando{n}}
+\newcommand{\HnGonMotMat}{\cando{ms}}
+\newcommand{\HnGonNhieuMat}{\cando{ms}}
+\newcommand{\HnGiamMotMat}{\cando{\%}}
+\newcommand{\HnGiamNhieuMat}{\cando{\%}}
+\newcommand{\HnSoLan}{\cando{n}}
+\newcommand{\HnNgayDo}{\cando{ngày đo}}
+\IfFileExists{auto/bang-hieu-nang.tex}{\input{auto/bang-hieu-nang}}{}
+
+% =====================================================================
+%  THÔNG TIN ĐỒ ÁN
+%  >>> SINH VIÊN ĐIỀN: họ tên, MSSV, lớp. Các dòng còn lại đã đúng.
+% =====================================================================
+\crname{BÁO CÁO ĐỒ ÁN TRÍ TUỆ NHÂN TẠO}
+\cmonhoc{Học phần AIP202 \textperiodcentered{} 2 tín chỉ}
+\ctname{HỆ THỐNG QUẢN LÝ SINH VIÊN TÍCH HỢP\\ĐIỂM DANH BẰNG NHẬN DIỆN KHUÔN MẶT}
+\cstuname{Nguyễn Đăng Sen}
+\cmssv{2351220206}
+\clopsv{CNTT 23A}                % <<< KIỂM TRA LẠI: đang đoán theo khoá 23
+\csCouncil{Công nghệ thông tin}
+\csSupervise{TS. Đỗ Phúc Hảo}
+\cttime{2026--2027}
+\csdeptname{KHOA CÔNG NGHỆ THÔNG TIN}
+\csplace{Đà Nẵng}
+
+\begin{document}
+
+\coverpage
+
+% ---------------------------------------------------------------------
+%  PHẦN ĐẦU
+% ---------------------------------------------------------------------
+\frontmatter
+\dauPageStyle
+
+\input{chuong/00-loi-cam-doan}
+\input{chuong/00-loi-cam-on}
+\input{chuong/00-tom-tat}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\listofalgorithms
+
+% ---------------------------------------------------------------------
+%  THÂN BÁO CÁO
+% ---------------------------------------------------------------------
+\mainmatter
+\dauPageStyle
+
+\input{chuong/01-mo-dau}
+\input{chuong/02-co-so-ly-thuyet}
+\input{chuong/03-phan-tich-thiet-ke}
+\input{chuong/04-cai-dat}
+\input{chuong/05-ket-qua-danh-gia}
+
+% ---------------------------------------------------------------------
+%  TÀI LIỆU THAM KHẢO VÀ PHỤ LỤC
+% ---------------------------------------------------------------------
+\backmatter
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo}
+\bibliographystyle{plain}
+\bibliography{refs}
+
+\input{chuong/07-phu-luc}
+
+\end{document}

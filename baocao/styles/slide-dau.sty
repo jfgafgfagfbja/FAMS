@@ -1,0 +1,188 @@
+% =====================================================================
+%  styles/slide-dau.sty
+%  Nhận diện DAU cho bộ slide bảo vệ đồ án (lớp beamer).
+%
+%  Vì sao không dùng lại styles/dau.sty: tệp đó dựng cho lớp book, có
+%  geometry, fancyhdr, titlesec và trang bìa riêng, nạp vào beamer sẽ
+%  xung đột. Tệp này chỉ mượn lại bảng màu, phông chữ và các style TikZ
+%  để slide trông cùng một bộ với quyển báo cáo.
+%
+%  SINH VIÊN KHÔNG SỬA TỆP NÀY.
+% =====================================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{styles/slide-dau}[2026/09/18 Slide do an, Khoa CNTT DAU]
+
+% ---------- Phông chữ và ngôn ngữ -----------------------------------
+\RequirePackage{fontspec}
+\RequirePackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+\setotherlanguage{english}
+\IfFontExistsTF{Noto Sans}{%
+  \setmainfont{Noto Sans}[Ligatures=TeX, BoldFont={Noto Sans Bold},
+                          ItalicFont={Noto Sans Italic}]
+  \setsansfont{Noto Sans}[Ligatures=TeX, BoldFont={Noto Sans Bold}]
+}{%
+  \PackageWarning{slide-dau}{Khong tim thay phong Noto Sans, dung phong mac dinh}%
+}
+\IfFontExistsTF{Noto Sans Mono}{\setmonofont{Noto Sans Mono}[Scale=0.88]}{}
+
+% ---------- Bảng màu DAU, giữ đúng mã màu của quyển báo cáo ----------
+\RequirePackage{xcolor}
+\definecolor{daumaroon}{HTML}{990000}
+\definecolor{daugold}{HTML}{FBAE40}
+\definecolor{daunavy}{HTML}{0E2841}
+\definecolor{forestgreen}{HTML}{0C2F1F}
+\definecolor{agentragreen}{HTML}{196B24}
+\definecolor{charcoal}{HTML}{0E2841}
+\definecolor{gray700}{HTML}{384152}
+\definecolor{gray500}{HTML}{6B7280}
+\definecolor{gray300}{HTML}{DADEE2}
+\definecolor{gray100}{HTML}{F3F4F6}
+\definecolor{lightlime}{HTML}{F0F5D5}
+\definecolor{lightforest}{HTML}{E8F0EA}
+\definecolor{lightwarm}{HTML}{FCEFD9}
+\definecolor{lightnavy}{HTML}{E7EBF0}
+
+% ---------- Gói dùng chung ------------------------------------------
+\RequirePackage{graphicx}
+\graphicspath{{figs/}{assets/}{./}}
+\RequirePackage{tabularx}
+\RequirePackage{booktabs}
+\RequirePackage{array}
+\RequirePackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, shadows}
+\RequirePackage{amsmath}
+\renewcommand{\arraystretch}{1.2}
+
+% ---------- Macro nội tuyến, đồng bộ với quyển báo cáo ---------------
+\newcommand{\en}[1]{{\small\itshape\color{gray500}\textenglish{#1}}}
+\newcommand{\code}[1]{{\normalfont\ttfamily\color{daumaroon}#1}}
+\newcommand{\term}[1]{\textbf{#1}}
+% Con số nổi bật giữa slide
+\newcommand{\solon}[2]{%
+  \begin{minipage}[t]{0.29\textwidth}\centering
+  {\fontsize{26}{28}\selectfont\bfseries\color{daumaroon}#1}\\[2pt]
+  {\small\color{gray700}#2}
+  \end{minipage}}
+
+% ---------- Style TikZ, giữ nguyên tên như trong báo cáo -------------
+\tikzset{soft/.style={drop shadow={black!30, opacity=0.26,
+                                   shadow xshift=0.5pt, shadow yshift=-0.7pt}}}
+\tikzset{
+  clsbox/.style = {rectangle, rounded corners=2pt, draw=daumaroon, line width=1pt,
+                  fill=white, align=center, inner sep=5pt, font=\scriptsize, soft},
+  objbox/.style = {rectangle, rounded corners=2pt, draw=daunavy, line width=0.8pt,
+                  fill=lightnavy, align=center, inner sep=5pt, font=\scriptsize, soft},
+  membox/.style = {rectangle, draw=charcoal, line width=0.5pt, fill=gray100,
+                  align=center, inner sep=4pt, font=\tiny, soft},
+  flowarr/.style = {-{Stealth[length=2.4mm]}, line width=1.0pt, color=daumaroon},
+  startstop/.style = {rectangle, rounded corners, minimum width=2.2cm, minimum height=0.8cm,
+                  text centered, draw=daumaroon, fill=lightwarm, font=\scriptsize},
+  process/.style = {rectangle, minimum width=2.2cm, minimum height=0.8cm, text centered,
+                  draw=daunavy, fill=white, font=\scriptsize},
+  decision/.style = {diamond, aspect=2, minimum width=2.2cm, text centered,
+                  draw=agentragreen, fill=lightforest, font=\scriptsize},
+}
+
+% ---------- Thông tin đồ án, khai báo ở slide.tex --------------------
+\newcommand{\@sdSinhVien}{Nguyễn Văn A}
+\newcommand{\sdSinhVien}[1]{\renewcommand{\@sdSinhVien}{#1}}
+\newcommand{\@sdMSSV}{2022xxxxx}
+\newcommand{\sdMSSV}[1]{\renewcommand{\@sdMSSV}{#1}}
+\newcommand{\@sdLop}{CNTT 22A}
+\newcommand{\sdLop}[1]{\renewcommand{\@sdLop}{#1}}
+\newcommand{\@sdGVHD}{TS. Đỗ Phúc Hảo}
+\newcommand{\sdGVHD}[1]{\renewcommand{\@sdGVHD}{#1}}
+\newcommand{\@sdMonHoc}{Học phần AIP202}
+\newcommand{\sdMonHoc}[1]{\renewcommand{\@sdMonHoc}{#1}}
+\newcommand{\@sdNoiNgay}{Đà Nẵng, 2026}
+\newcommand{\sdNoiNgay}[1]{\renewcommand{\@sdNoiNgay}{#1}}
+\newcommand{\sdTenSinhVien}{\@sdSinhVien}
+\newcommand{\sdMaSinhVien}{\@sdMSSV}
+\newcommand{\sdTenGVHD}{\@sdGVHD}
+\newcommand{\sdTenLop}{\@sdLop}
+\newcommand{\sdTenMonHoc}{\@sdMonHoc}
+\newcommand{\sdDiaDiemNgay}{\@sdNoiNgay}
+
+% =====================================================================
+%  Giao diện beamer
+% =====================================================================
+\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{structure}{fg=daumaroon}
+\setbeamercolor{normal text}{fg=charcoal}
+\setbeamercolor{frametitle}{fg=daumaroon, bg=white}
+\setbeamercolor{itemize item}{fg=daumaroon}
+\setbeamercolor{itemize subitem}{fg=daugold}
+\setbeamercolor{enumerate item}{fg=daumaroon}
+\setbeamercolor{block title}{fg=white, bg=daunavy}
+\setbeamercolor{block body}{fg=charcoal, bg=lightnavy}
+\setbeamercolor{alerted text}{fg=daumaroon}
+\setbeamerfont{frametitle}{series=\bfseries, size=\large}
+\setbeamerfont{block title}{series=\bfseries, size=\small}
+\setbeamertemplate{itemize item}{\color{daumaroon}\textbullet}
+\setbeamertemplate{itemize subitem}{\color{daugold}\textendash}
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamersize{text margin left=0.9cm, text margin right=0.9cm}
+
+% Tiêu đề slide: chữ đỏ, gạch vàng bên dưới.
+\setbeamertemplate{frametitle}{%
+  \vspace*{0.55em}%
+  \begin{minipage}{\textwidth}%
+    \raggedright
+    {\usebeamerfont{frametitle}\usebeamercolor[fg]{frametitle}\insertframetitle\par}%
+    \ifx\insertframesubtitle\@empty\else
+      {\small\color{gray500}\insertframesubtitle\par}%
+    \fi
+    \vskip2pt
+    {\color{daugold}\rule{\textwidth}{1.4pt}}%
+  \end{minipage}%
+}
+
+% Chân slide: họ tên, mã số, tên đề tài rút gọn, số trang.
+\setbeamertemplate{footline}{%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.42\paperwidth, ht=2.4ex, dp=1.4ex, left]{}%
+      \hspace*{0.9cm}{\tiny\color{gray500}\@sdSinhVien{} \textperiodcentered{} \@sdMSSV}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.44\paperwidth, ht=2.4ex, dp=1.4ex, center]{}%
+      {\tiny\color{gray500} FAMS \textperiodcentered{} Điểm danh bằng nhận diện khuôn mặt}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.14\paperwidth, ht=2.4ex, dp=1.4ex, right]{}%
+      {\tiny\color{gray500}\insertframenumber{}/\inserttotalframenumber}\hspace*{0.9cm}%
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+% Trang bìa slide.
+\newcommand{\slidebia}[1]{%
+\begin{frame}[plain]
+  \begin{center}
+    \includegraphics[height=1.15cm]{dau-logo.png}\\[3pt]
+    {\footnotesize\color{daunavy} TRƯỜNG ĐẠI HỌC KIẾN TRÚC ĐÀ NẴNG
+     \textperiodcentered{} KHOA CÔNG NGHỆ THÔNG TIN}\\[5pt]
+    {\color{daumaroon}\rule{0.62\textwidth}{1.8pt}}\\[0.5cm]
+    {\fontsize{17}{21}\selectfont\bfseries\color{daumaroon} #1}\\[0.9cm]
+    {\small\color{gray700}
+     \begin{tabular}{@{}r@{\hspace{0.4cm}}l@{}}
+       \bfseries Sinh viên thực hiện & \@sdSinhVien{} \textperiodcentered{} \@sdMSSV \\
+       \bfseries Lớp & \@sdLop \\
+       \bfseries Giảng viên hướng dẫn & \@sdGVHD \\
+       \bfseries Học phần & \@sdMonHoc \\
+     \end{tabular}}\\[0.7cm]
+    {\footnotesize\color{gray500}\@sdNoiNgay}
+  \end{center}
+\end{frame}}
+
+% Slide phân đoạn giữa các phần.
+\newcommand{\slidephan}[2]{%
+\begin{frame}[plain]
+  \vfill
+  \begin{center}
+    {\fontsize{40}{40}\selectfont\bfseries\color{daugold} #1}\\[6pt]
+    {\Large\bfseries\color{daumaroon} #2}\\[4pt]
+    {\color{daugold}\rule{5cm}{1.4pt}}
+  \end{center}
+  \vfill
+\end{frame}}
+
+\endinput

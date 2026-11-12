@@ -1,0 +1,30 @@
+% Sinh tu backend/app/core/config.py. KHONG SUA TAY.
+\newcommand{\BangCauHinh}{%
+\code{ACCESS\_TOKEN\_EXPIRE\_MINUTES} & 480 & Thời hạn access token \\
+\code{REFRESH\_TOKEN\_EXPIRE\_DAYS} & 30 & Thời hạn refresh token của app mobile \\
+\code{RECOGNITION\_THRESHOLD} & 0{,}45 & Ngưỡng cosine để coi là khớp danh tính \\
+\code{DUPLICATE\_THRESHOLD} & 0{,}6 & Ngưỡng cảnh báo khuôn mặt trùng người khác khi đăng ký \\
+\code{LATE\_AFTER\_MINUTES} & 15 & Sau bao nhiêu phút thì tính là đi muộn \\
+\code{EARLY\_OPEN\_MINUTES} & 15 & Được mở phiên sớm trước giờ vào tiết \\
+\code{SESSION\_GRACE\_MINUTES} & 30 & Sau giờ kết thúc bao lâu thì ngừng nhận và tự động đóng phiên \\
+\code{EVIDENCE\_RETENTION\_DAYS} & 90 & Số ngày lưu ảnh bằng chứng trước khi xoá tự động \\
+\code{MEDIA\_URL\_EXPIRE\_MINUTES} & 60 & Thời hạn của đường dẫn ảnh được ký điện tử (HMAC) \\
+\code{ANTISPOOF\_ENABLED} & Bật & Bật hoặc tắt kiểm tra chống giả mạo \\
+\code{ANTISPOOF\_THRESHOLD} & 0{,}5 & Điểm “mặt thật” tối thiểu của MiniFASNetV2 \\
+\code{CONFIRM\_FRAMES} & 2 & Số khung hình phải nhận diện đúng trước khi ghi điểm danh \\
+\code{SELF\_CHECKIN\_REQUIRE\_LOCATION} & Bật & Bắt buộc đối chiếu GPS khi sinh viên tự điểm danh \\
+\code{SELF\_CHECKIN\_MAX\_ACCURACY\_M} & 100 & Sai số GPS tối đa chấp nhận, tính bằng mét \\
+\code{ROOM\_MIN\_RADIUS\_M} & 50 & Bán kính tối thiểu khi đối chiếu GPS theo toạ độ riêng của phòng, bù sai số GPS trong nhà \\
+\code{CHECKIN\_QR\_ROTATE\_SECONDS} & 30 & Chu kỳ đổi mã QR điểm danh chiếu trong phòng, tính bằng giây \\
+\code{SELF\_CHECKIN\_REQUIRE\_QR\_DEFAULT} & Tắt & Mặc định phiên mới có bắt buộc quét mã QR khi tự điểm danh \\
+\code{APP\_PUBLIC\_URL} &  & Địa chỉ công khai của ứng dụng, dùng cho đường link trong email và mã QR điểm danh \\
+\code{NOTIFY\_EMAIL\_INTERVAL\_SECONDS} & 15 & Chu kỳ quét hàng đợi gửi email thông báo cho phụ huynh \\
+\code{NOTIFY\_EMAIL\_MAX\_ATTEMPTS} & 3 & Số lần thử gửi một email thông báo trước khi đánh dấu thất bại \\
+\code{ABSENCE\_WARN\_RATIO} & 0{,}2 & Tỉ lệ vắng không phép chạm ngưỡng cảnh báo cấm thi \\
+\code{APP\_UTC\_OFFSET\_MINUTES} & 420 & Múi giờ gắn vào mốc thời gian trả về cho client \\
+\code{LOGIN\_RATE\_LIMIT} & 30/minute & Giới hạn số lần đăng nhập theo địa chỉ IP \\
+\code{LOGIN\_MAX\_FAILED\_PER\_ACCOUNT} & 5 & Số lần sai mật khẩu tối đa cho một tài khoản \\
+\code{LOGIN\_FAILED\_WINDOW\_MINUTES} & 5 & Cửa sổ thời gian đếm số lần đăng nhập sai \\
+\code{BACKGROUND\_JOBS\_ENABLED} & Bật & Bật hoặc tắt vòng lặp nền dọn ảnh và tự động đóng phiên \\
+\code{OTP\_EXPIRE\_MINUTES} & 10 & Thời hạn mã OTP đặt lại mật khẩu \\
+}

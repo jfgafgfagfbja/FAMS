@@ -1,0 +1,24 @@
+% Sinh tu backend/app/db/models.py. KHONG SUA TAY.
+\newcommand{\BangDuLieu}{%
+\code{users} & Tài khoản đăng nhập dùng chung cho mọi vai trò \\
+\code{units} & Đơn vị: Khoa, Phòng Đào tạo, Phòng CTSV, Ban ngành \\
+\code{staff} & Hồ sơ cán bộ, mỗi cán bộ thuộc đúng một đơn vị \\
+\code{students} & Hồ sơ sinh viên; đồng ý sinh trắc: phiên bản, cách ghi nhận, người ghi nhận \\
+\code{lecturers} & Hồ sơ giảng viên \\
+\code{classes} & Lớp học phần trong một học kỳ \\
+\code{enrollments} & Ghi danh sinh viên vào lớp học phần \\
+\code{locations} & Địa điểm điểm danh kèm bán kính cho phép \\
+\code{rooms} & Phòng học thuộc một địa điểm, có thể có toạ độ và bán kính riêng \\
+\code{schedules} & Lịch học cố định theo thứ trong tuần \\
+\code{attendance\_sessions} & Phiên điểm danh của một lịch học trong một ngày \\
+\code{attendance\_records} & Bản ghi điểm danh của từng sinh viên trong phiên \\
+\code{attendance\_audits} & Nhật ký mỗi lần sửa trạng thái điểm danh \\
+\code{face\_embeddings} & Vector đặc trưng khuôn mặt 512 chiều và trạng thái duyệt \\
+\code{revoked\_tokens} & Access token đã bị thu hồi trước hạn \\
+\code{refresh\_tokens} & Refresh token của app mobile, lưu bản băm và xoay vòng \\
+\code{password\_resets} & Yêu cầu đặt lại mật khẩu bằng OTP \\
+\code{parents} & Tài khoản phụ huynh \\
+\code{parent\_students} & Liên kết phụ huynh với sinh viên \\
+\code{notifications} & Thông báo điểm danh gửi phụ huynh, kèm trạng thái gửi email \\
+\code{audit\_logs} & Nhật ký hệ thống: người thao tác, hành động, đối tượng, Khoa liên quan \\
+}

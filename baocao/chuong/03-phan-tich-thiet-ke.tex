@@ -1,0 +1,830 @@
+% ---------------------------------------------------------------------
+%  CHƯƠNG 3 — PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
+% ---------------------------------------------------------------------
+\chapter{Phân tích và thiết kế hệ thống}
+\label{ch:thietke}
+
+\begin{muctieu}
+Chương này phân tích yêu cầu và ca sử dụng của từng nhóm người dùng, trình
+bày kiến trúc tổng thể, thiết kế cơ sở dữ liệu và giao diện lập trình, mô hình
+phân quyền theo chức năng và phạm vi dữ liệu, các lớp phòng vệ chống gian lận
+điểm danh, cơ chế đồng ý sinh trắc học và nhật ký hệ thống.
+\end{muctieu}
+
+\section{Phân tích yêu cầu}
+
+\subsection{Tác nhân của hệ thống}
+
+Hệ thống phục vụ \FsoVaiTro{} vai trò, phản ánh đúng cơ cấu tổ chức của một
+trường đại học chứ không gộp tất cả cán bộ thành một vai trò quản trị duy
+nhất. Riêng cấp Khoa được tách thành hai vai trò: văn phòng Khoa làm công
+việc nhập liệu, còn lãnh đạo Khoa giám sát và phê duyệt.
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries}p{3.4cm} X@{}}
+\caption{Các tác nhân và nhu cầu chính.}
+\label{tab:tacnhan}\\
+\toprule
+Tác nhân & Nhu cầu chính \\
+\midrule
+\endfirsthead
+\toprule
+Tác nhân & Nhu cầu chính \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Quản trị viên & Quản trị toàn hệ thống: đơn vị, tài khoản cán bộ, dữ liệu
+  gốc, xem nhật ký hệ thống, xử lý sự cố \\
+Phòng Đào tạo & Tổ chức đào tạo toàn trường: lớp học phần, lịch học, phòng
+  học, ghi danh, phân công giảng dạy \\
+Phòng Công tác sinh viên & Hồ sơ sinh viên và phụ huynh, ghi nhận đồng ý sinh
+  trắc học, duyệt dữ liệu khuôn mặt, duyệt nghỉ có phép \\
+Văn phòng Khoa & Nhập liệu của Khoa: lớp học phần, lịch học, ghi danh, phân
+  công giảng viên trong Khoa mình \\
+Lãnh đạo Khoa & Giám sát chuyên cần của Khoa, duyệt nghỉ có phép, xem nhật
+  ký thao tác của Khoa; không nhập liệu \\
+Ban ngành & Xem số liệu chuyên cần tổng hợp, không xem thông tin cá nhân \\
+Giảng viên & Mở phiên, quét camera, chiếu mã QR, xác nhận tay, sửa điểm danh
+  lớp mình dạy \\
+Sinh viên & Đồng ý hoặc rút đồng ý sinh trắc học, đăng ký khuôn mặt, tự điểm
+  danh, theo dõi chuyên cần \\
+Phụ huynh & Theo dõi chuyên cần của con, nhận thông báo mỗi lần con được
+  điểm danh \\
+\end{xltabular}}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{3.6cm} >{\raggedright\arraybackslash\leavevmode}X >{\raggedright\arraybackslash\leavevmode}p{4.4cm}@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:tacnhan}: phạm vi dữ liệu và thiết bị của từng tác nhân.}
+\label{tab:tacnhan-gt}\\
+\toprule
+Tác nhân & Thấy dữ liệu của ai & Dùng chủ yếu trên \\
+\midrule
+\endfirsthead
+\toprule
+Tác nhân & Thấy dữ liệu của ai & Dùng chủ yếu trên \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Quản trị viên & Toàn trường & Web \\
+Phòng Đào tạo & Toàn trường & Web \\
+Phòng Công tác sinh viên & Toàn trường & Web \\
+Văn phòng Khoa & Chỉ sinh viên, giảng viên, lớp thuộc Khoa mình & Web \\
+Lãnh đạo Khoa & Chỉ Khoa mình, kể cả nhật ký thao tác liên quan tới Khoa & Web \\
+Ban ngành & Chỉ số liệu tổng hợp, không có tên hay ảnh & Web \\
+Giảng viên & Các lớp mình dạy & Web, máy tính trong phòng để quét camera và chiếu mã QR \\
+Sinh viên & Dữ liệu của chính mình & Điện thoại \\
+Phụ huynh & Con đã được Phòng Công tác sinh viên liên kết & Điện thoại \\
+\end{xltabular}}
+
+\subsection{Ca sử dụng theo từng tác nhân}
+\label{sec:casudung}
+
+Mỗi tác nhân chỉ được giao những ca sử dụng \cite{OMG2017UML} gắn với nhiệm vụ của mình trong
+tổ chức. Bảng~\ref{tab:casudung} liệt kê đầy đủ; ngoài các ca này, mọi tài
+khoản đều dùng chung ba ca cơ bản là đăng nhập, đổi mật khẩu và quên mật khẩu
+bằng mã OTP.
+
+{\footnotesize
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}X@{}}
+\caption{Ca sử dụng của từng tác nhân.}
+\label{tab:casudung}\\
+\toprule
+Tác nhân & Ca sử dụng \\
+\midrule
+\endfirsthead
+\toprule
+Tác nhân & Ca sử dụng \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Quản trị viên & UC01 Quản lý đơn vị, tài khoản cán bộ, đặt lại mật khẩu mọi tài khoản;
+  UC02 Quản lý mọi danh mục khi cần thay phòng ban;
+  UC03 Xem nhật ký hệ thống toàn trường \\
+Phòng Đào tạo & UC04 Quản lý lớp học phần, ghi danh, phân công giảng viên;
+  UC05 Xếp lịch học vào phòng, chặn trùng phòng;
+  UC06 Quản lý phòng học và địa điểm điểm danh;
+  UC07 Quản lý hồ sơ giảng viên;
+  UC08 Xem báo cáo chuyên cần toàn trường \\
+Phòng CTSV & UC09 Quản lý hồ sơ sinh viên, phụ huynh, liên kết và đặt lại mật khẩu của họ;
+  UC10 Ghi nhận đồng ý sinh trắc theo bản giấy, rút đồng ý theo đơn;
+  UC11 Duyệt ảnh khuôn mặt;
+  UC12 Duyệt nghỉ có phép toàn trường \\
+Văn phòng Khoa & UC13 Quản lý lớp học phần, lịch học, ghi danh của Khoa;
+  UC14 Xem sinh viên, giảng viên, điểm danh, báo cáo của Khoa \\
+Lãnh đạo Khoa & UC15 Giám sát chuyên cần và cảnh báo vắng của Khoa;
+  UC16 Duyệt nghỉ có phép trong Khoa;
+  UC17 Xem nhật ký thao tác của Khoa \\
+Ban ngành & UC18 Xem thống kê tổng hợp không định danh \\
+Giảng viên & UC19 Mở và đóng phiên điểm danh;
+  UC20 Quét camera nhận diện cả lớp;
+  UC21 Chiếu mã QR điểm danh;
+  UC22 Xác nhận tay, sửa điểm danh kèm lý do;
+  UC23 Xem báo cáo lớp mình dạy \\
+Sinh viên & UC24 Đồng ý hoặc rút đồng ý sinh trắc học;
+  UC25 Đăng ký khuôn mặt;
+  UC26 Tự điểm danh bằng khuôn mặt, vị trí và mã QR;
+  UC27 Xem lịch học và chuyên cần \\
+Phụ huynh & UC28 Xem chuyên cần của con;
+  UC29 Nhận thông báo điểm danh trong ứng dụng và qua email;
+  UC30 Chọn loại thông báo muốn nhận \\
+\end{xltabular}}
+
+{\footnotesize
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{3.2cm} >{\raggedright\arraybackslash\leavevmode}X >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:casudung}: đặc tả một số ca sử dụng tiêu biểu.}
+\label{tab:casudung-gt}\\
+\toprule
+Ca sử dụng & Điều kiện trước & Luồng chính & Kết quả và ngoại lệ \\
+\midrule
+\endfirsthead
+\toprule
+Ca sử dụng & Điều kiện trước & Luồng chính & Kết quả và ngoại lệ \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+UC19 Mở và đóng phiên (giảng viên) & Có lịch học của lớp mình hôm nay; trong khoảng từ \FphutMoSom{} phút trước giờ vào tới giờ kết thúc & Chọn buổi ở mục lịch dạy hôm nay, bấm Mở phiên, tuỳ chọn bật yêu cầu mã QR, nhận điểm danh rồi bấm Đóng phiên & Lúc đóng, sinh viên chưa có bản ghi thành Vắng và cảnh báo được tính lại; quên đóng thì hệ thống tự đóng sau \FphutAnHan{} phút. Mở ngoài khung giờ bị từ chối \\
+UC20 Quét camera nhận diện cả lớp (giảng viên) & Phiên đang mở & Màn quét chụp định kỳ, mặc định 2 giây một lần, gửi khung hình lên; máy chủ chỉ so khớp với sinh viên của lớp & Sinh viên được nhận ra đủ \FsoKhungXacNhan{} lần thì được ghi Có mặt, hoặc Muộn nếu quá \FphutMuon{} phút; khuôn mặt nghi giả mạo được đánh dấu và không được ghi \\
+UC26 Tự điểm danh (sinh viên) & Đã ghi danh, đã đồng ý sinh trắc học, có khuôn mặt đã duyệt, phiên đang mở & Quét mã QR bằng camera điện thoại hoặc mở mục Tự điểm danh, hệ thống lấy toạ độ, sinh viên chụp ảnh và gửi & Ghi điểm danh kèm khoảng cách và ảnh bằng chứng. Chưa đồng ý, thiếu hoặc sai mã, ngoài vùng, vị trí giả lập, khuôn mặt không khớp: mỗi trường hợp có thông báo riêng \\
+UC16 Duyệt nghỉ có phép (lãnh đạo Khoa) & Sinh viên thuộc Khoa hoặc lớp do Khoa quản lý; bản ghi đang ở trạng thái Vắng & Mở phiên hoặc trang sinh viên, bấm Duyệt có phép, nhập lý do & Trạng thái thành Có phép, ghi vào nhật ký sửa, phụ huynh nhận thông báo cập nhật. Không có lý do thì không lưu; ngoài Khoa bị từ chối \\
+UC24 Đồng ý hoặc rút đồng ý (sinh viên) & Đăng nhập bằng tài khoản sinh viên & Vào mục Khuôn mặt, đọc nội dung có số phiên bản, đánh dấu rồi xác nhận; hoặc bấm Rút đồng ý & Đồng ý được lưu kèm phiên bản và cách ghi nhận; rút đồng ý thì ảnh và vector khuôn mặt bị xoá ngay. Nội dung vừa đổi phiên bản thì phải đọc lại \\
+Đặt lại mật khẩu (quản trị viên, Phòng Công tác sinh viên) & Tài khoản cần đặt lại thuộc phạm vi của người thao tác & Chọn Đặt lại mật khẩu ở dòng của người đó, nhập mật khẩu mới hai lần & Người đó bị đăng xuất khỏi mọi thiết bị, OTP còn hiệu lực bị huỷ, tài khoản đang khoá được mở. Hai lần nhập khác nhau hoặc vai trò không có quyền đều bị từ chối \\
+\end{xltabular}}
+
+Ở cấp Khoa, việc tách hai tác nhân xuất phát từ nguyên tắc \term{phân tách
+nhiệm vụ} \cite{Sandhu1996RBAC}: người nhập dữ liệu không đồng thời là người phê duyệt dữ liệu đó.
+Hình~\ref{fig:uckhoa} cho thấy hai tác nhân dùng chung nhóm ca sử dụng chỉ
+xem, còn nhóm ca sử dụng làm thay đổi dữ liệu thì tách hẳn về hai phía.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[every node/.append style={align=center},
+  uc/.style={ellipse, draw=daunavy, line width=0.7pt, fill=white, inner sep=0pt,
+             minimum width=3.1cm, minimum height=0.9cm, font=\scriptsize},
+  ucc/.style={uc, draw=daumaroon},
+  lk/.style={line width=0.6pt, color=charcoal},
+  actor/.style={line width=0.8pt}]
+  % ranh gioi he thong
+  \draw[line width=0.6pt, color=charcoal, rounded corners=3pt] (2.2,-4.3) rectangle (13.8,2.75);
+  \node[anchor=north west, font=\scriptsize\bfseries] at (2.3,2.7) {FAMS, phạm vi một Khoa};
+  % cot giua: dung chung, chi xem
+  \node[ucc] (s1) at (8.0,1.9) {Xem sinh viên,\\ giảng viên, lớp};
+  \node[ucc] (s2) at (8.0,0.8) {Xem điểm danh,\\ báo cáo, cảnh báo};
+  % cot trai: van phong Khoa nhap lieu
+  \node[uc] (v1) at (4.3,-0.5)  {Thêm, sửa\\ lớp học phần};
+  \node[uc] (v2) at (4.3,-1.55) {Xếp lịch học,\\ chọn phòng};
+  \node[uc] (v3) at (4.3,-2.6)  {Ghi danh\\ sinh viên};
+  \node[uc] (v4) at (4.3,-3.65) {Phân công\\ giảng viên};
+  % cot phai: lanh dao Khoa phe duyet, giam sat
+  \node[uc] (l1) at (11.7,-0.5)  {Duyệt nghỉ\\ có phép};
+  \node[uc] (l2) at (11.7,-1.55) {Xem nhật ký\\ của Khoa};
+  % tac nhan
+  \foreach \x in {1.0, 15.0}
+    \draw[actor] (\x,-0.45) circle (0.16) (\x,-0.61)--(\x,-1.05) (\x-0.28,-0.75)--(\x+0.28,-0.75)
+                 (\x,-1.05)--(\x-0.2,-1.4) (\x,-1.05)--(\x+0.2,-1.4);
+  \node[font=\scriptsize] at (1.0,-1.85) {Văn phòng\\ Khoa};
+  \node[font=\scriptsize] at (15.0,-1.85) {Lãnh đạo\\ Khoa};
+  \foreach \u in {v1, v2, v3, v4, s1, s2} \draw[lk] (1.35,-0.75) -- (\u.west);
+  \foreach \u in {l1, l2, s1, s2} \draw[lk] (14.65,-0.75) -- (\u.east);
+\end{tikzpicture}
+\caption{Ca sử dụng của hai tác nhân cấp Khoa: dùng chung nhóm chỉ xem, tách
+riêng nhóm nhập liệu và nhóm phê duyệt.}
+\label{fig:uckhoa}
+\end{figure}
+
+\subsection{Yêu cầu chức năng}
+
+Nhóm chức năng cốt lõi gồm: quản lý danh mục và hồ sơ, trong đó có danh mục
+phòng học; đồng ý sinh trắc học, đăng ký cùng duyệt dữ liệu khuôn mặt; vòng
+đời phiên điểm danh gồm mở phiên, nhận diện, chiếu mã QR, xác nhận tay, tự
+điểm danh và đóng phiên; sửa điểm danh có lưu vết lý do; thông báo điểm danh
+cho phụ huynh; báo cáo chuyên cần, cảnh báo vắng và xuất Excel; thống kê tổng
+hợp cho cấp quản lý; nhật ký hệ thống.
+
+\subsection{Yêu cầu phi chức năng}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+  \item \textbf{Hiệu năng}: nhận diện một khung hình phải đủ nhanh để giảng
+        viên quét liên tục trong lớp, trên máy chủ chỉ có CPU.
+  \item \textbf{An toàn}: mật khẩu băm bằng bcrypt \cite{Provos1999Bcrypt}; phiên đăng nhập thu hồi
+        được; ảnh khuôn mặt và ảnh bằng chứng không truy cập được nếu không
+        có quyền.
+  \item \textbf{Riêng tư}: không có đồng ý sinh trắc học thì không có xử lý
+        dữ liệu khuôn mặt; sinh viên xem được, rút đồng ý được và khi rút thì
+        dữ liệu khuôn mặt bị xoá ngay.
+  \item \textbf{Khả năng kiểm chứng}: mọi thay đổi trạng thái điểm danh đều
+        lưu người thực hiện, thời điểm và lý do; mọi thao tác quản lý và mọi
+        lần đăng nhập đều nằm trong nhật ký hệ thống.
+  \item \textbf{Đa nền tảng}: cùng một mã nguồn chạy trên Web, Android, iOS.
+\end{itemize}
+
+\section{Kiến trúc tổng thể}
+
+Hệ thống theo kiến trúc ba lớp \cite{Fowler2002PoEAA}, tách rõ ứng dụng người dùng, dịch vụ nghiệp
+vụ và tầng lưu trữ (Hình~\ref{fig:kientruc}). Toàn bộ suy luận mô hình nằm ở
+phía máy chủ, vì mô hình nặng khoảng 300\,MB và không thể phân phát xuống mọi
+thiết bị của sinh viên.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm and 0.8cm, every node/.append style={align=center}]
+  \node (web)   [objbox] {Flutter Web\\ \scriptsize cán bộ, giảng viên};
+  \node (mobi)  [objbox, below=of web] {Flutter Android, iOS\\ \scriptsize sinh viên, phụ huynh};
+  \node (api)   [clsbox, right=of web, yshift=-1.05cm, minimum height=1.9cm]
+        {FastAPI\\ \scriptsize \FsoEndpoint{} endpoint\\ \scriptsize xác thực, phân quyền};
+  \node (svc)   [clsbox, right=of api, minimum height=1.9cm]
+        {Lớp dịch vụ\\ \scriptsize nhận diện, chống giả mạo,\\ \scriptsize phiên, vị trí, thống kê};
+  \node (db)    [membox, right=of svc, yshift=0.55cm] {PostgreSQL 16\\ \scriptsize pgvector, HNSW};
+  \node (onnx)  [membox, right=of svc, yshift=-0.7cm] {ONNX Runtime\\ \scriptsize SCRFD, ArcFace,\\ \scriptsize MiniFASNetV2};
+  \draw [flowarr] (web)  -- node[above, font=\scriptsize] {HTTPS} (api);
+  \draw [flowarr] (mobi) -- (api);
+  \draw [flowarr] (api)  -- (svc);
+  \draw [flowarr] (svc)  -- (db);
+  \draw [flowarr] (svc)  -- (onnx);
+\end{tikzpicture}
+\caption{Kiến trúc ba lớp của hệ thống FAMS.}
+\label{fig:kientruc}
+\end{figure}
+
+Ba vòng lặp nền chạy song song với dịch vụ chính: một vòng dọn ảnh bằng
+chứng quá hạn lưu trữ \FngayLuuAnh{} ngày, một vòng tự động đóng những phiên
+điểm danh bị quên đóng, và một vòng gửi email thông báo cho phụ huynh. Cả ba
+tắt được bằng tham số cấu hình để môi trường kiểm thử không chạm vào cơ sở dữ
+liệu thật hay gửi thư ra ngoài.
+
+\section{Thiết kế cơ sở dữ liệu}
+
+Lược đồ gồm \FsoBang{} bảng, quản lý bằng \FsoMigration{} phiên bản di trú
+Alembic. Bảng~\ref{tab:luocdo} liệt kê toàn bộ.
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash\leavevmode}p{5.0cm} X@{}}
+\caption{Các bảng trong cơ sở dữ liệu.}
+\label{tab:luocdo}\\
+\toprule
+Bảng & Nội dung \\
+\midrule
+\endfirsthead
+\toprule
+Bảng & Nội dung \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\BangDuLieu
+\end{xltabular}}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.4cm} >{\raggedright\arraybackslash\leavevmode}p{4.4cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:luocdo}: các nhóm bảng và liên kết chính giữa chúng.}
+\label{tab:luocdo-gt}\\
+\toprule
+Nhóm & Bảng & Liên kết chính \\
+\midrule
+\endfirsthead
+\toprule
+Nhóm & Bảng & Liên kết chính \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Tài khoản, đơn vị & \code{users}, \code{units}, \code{staff} & \code{staff} trỏ tới \code{users} và \code{units}: mỗi tài khoản cán bộ thuộc đúng một đơn vị \\
+Hồ sơ & \code{students}, \code{lecturers}, \code{parents}, \code{parent\_students} & Ba bảng hồ sơ đều trỏ tới \code{users}; sinh viên và giảng viên trỏ tới \code{units} để biết thuộc Khoa nào; \code{parent\_students} nối phụ huynh với sinh viên \\
+Đào tạo & \code{classes}, \code{enrollments}, \code{schedules}, \code{locations}, \code{rooms} & Lớp trỏ tới giảng viên và Khoa; \code{enrollments} nối sinh viên với lớp, mỗi cặp chỉ một lần; lịch học trỏ tới lớp, phòng và địa điểm; phòng thuộc một địa điểm \\
+Điểm danh & \code{attendance\_sessions}, \code{attendance\_records}, \code{attendance\_audits} & Phiên trỏ tới lịch học, mỗi lịch một phiên một ngày; bản ghi trỏ tới phiên và sinh viên, mỗi sinh viên một bản ghi trong phiên; nhật ký sửa trỏ tới bản ghi và người sửa \\
+Sinh trắc & \code{face\_embeddings} & Mỗi vector trỏ tới một sinh viên, kèm trạng thái duyệt \\
+Bảo mật & \code{refresh\_tokens}, \code{password\_resets}, \code{revoked\_tokens} & Hai bảng đầu trỏ tới \code{users}; \code{revoked\_tokens} chỉ lưu mã định danh của access token bị thu hồi, không có khoá ngoại \\
+Thông báo, nhật ký & \code{notifications}, \code{audit\_logs} & Thông báo bị xoá theo người nhận và để trống liên kết khi bản ghi điểm danh bị xoá; nhật ký giữ lại khi người thao tác hay Khoa bị xoá, chỉ để trống liên kết \\
+\end{xltabular}}
+
+Bốn quyết định thiết kế đáng chú ý:
+
+\begin{enumerate}[leftmargin=1.8em, itemsep=3pt]
+  \item \textbf{Vector đặc trưng nằm chung cơ sở dữ liệu quan hệ.} Cột
+        \code{embedding} của bảng \code{face\_embeddings} có kiểu
+        \code{Vector(\FchieuVector)} do pgvector cung cấp, kèm chỉ mục HNSW.
+        Nhờ vậy một câu truy vấn duy nhất vừa lọc theo lớp học phần và trạng
+        thái duyệt, vừa sắp xếp theo khoảng cách cosine.
+  \item \textbf{Ràng buộc duy nhất đặt ở tầng cơ sở dữ liệu.} Mỗi lịch học
+        chỉ có một phiên trong một ngày, mỗi sinh viên chỉ có một bản ghi
+        trong một phiên, mỗi sinh viên chỉ ghi danh một lần vào một lớp.
+        Những ràng buộc này được cơ sở dữ liệu bảo đảm \cite{Haerder1983Principles}, nên hai yêu cầu gửi
+        đồng thời cũng không tạo được bản ghi trùng.
+  \item \textbf{Mọi thao tác sửa điểm danh đều để lại vết.} Bảng
+        \code{attendance\_audits} lưu trạng thái cũ, trạng thái mới, người
+        sửa và lý do bắt buộc. Đây là điều kiện cần để kết quả chuyên cần có
+        giá trị khi bị khiếu nại.
+  \item \textbf{Nhật ký hệ thống tách khỏi nhật ký sửa điểm danh.} Bảng
+        \code{audit\_logs} ghi mọi thao tác quản lý trên toàn hệ thống, kèm
+        cột \code{faculty\_id} chốt lại Khoa liên quan ngay lúc ghi để lãnh
+        đạo Khoa lọc được phần của mình. Thiết kế chi tiết ở
+        Mục~\ref{sec:nhatky}.
+\end{enumerate}
+
+\section{Thiết kế giao diện lập trình}
+
+Dịch vụ cung cấp \FsoEndpoint{} endpoint chia theo \FsoModuleApi{} nhóm chức
+năng (Bảng~\ref{tab:api}). Toàn bộ đều yêu cầu access token, trừ đăng nhập và
+luồng quên mật khẩu.
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash\leavevmode}p{3.1cm} c X@{}}
+\caption{Các nhóm endpoint của dịch vụ.}
+\label{tab:api}\\
+\toprule
+Tiền tố & Số lượng & Chức năng \\
+\midrule
+\endfirsthead
+\toprule
+Tiền tố & Số lượng & Chức năng \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\BangApi
+\end{xltabular}}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{3.4cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:api}: quy ước chung của mọi endpoint.}
+\label{tab:api-gt}\\
+\toprule
+Mục & Quy ước \\
+\midrule
+\endfirsthead
+\toprule
+Mục & Quy ước \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Tiền tố & Mỗi nhóm có tiền tố riêng như \code{/students}; khi chạy sau nginx, toàn bộ API nằm dưới \code{/api} \\
+Số lượng & Số endpoint của nhóm, đếm tự động từ mã nguồn \\
+Phương thức & GET để đọc; POST để tạo mới hoặc thực hiện một hành động như mở phiên, tự điểm danh, đặt lại mật khẩu; PATCH để sửa một phần; DELETE để xoá \\
+Xác thực & Gửi kèm \code{Authorization: Bearer} cùng access token, trừ đăng nhập, làm mới token và quên mật khẩu bằng OTP; ảnh bằng chứng dùng đường dẫn được ký điện tử thay cho token \\
+Phân trang & Danh sách lớn nhận \code{q}, \code{offset}, \code{limit} và trả tổng số bản ghi trong header \code{X-Total-Count} \\
+Mã lỗi & 400 sai quy tắc nghiệp vụ; 401 chưa đăng nhập hoặc token hết hạn; 403 không đủ quyền hoặc ngoài phạm vi; 404 không tồn tại; 409 xung đột trạng thái, như nội dung đồng ý đã đổi phiên bản hay xoá lớp đang có sinh viên; 422 sai kiểu hoặc thiếu trường; 429 đăng nhập sai quá nhiều lần \\
+\end{xltabular}}
+
+Về xác thực, hệ thống dùng access token dạng JWT \cite{RFC7519} có thời hạn \FphutToken{}
+phút, kèm refresh token xoay vòng \cite{RFC9700} thời hạn \FngayRefresh{} ngày cho ứng dụng
+di động. Mỗi lần làm mới, refresh token cũ bị thu hồi; nếu một token đã thu
+hồi được dùng lại, hệ thống coi là dấu hiệu bị đánh cắp và thu hồi toàn bộ
+token của tài khoản đó.
+
+Người quên mật khẩu có hai đường lấy lại. Đường thứ nhất là mã OTP \cite{NIST80063B4} gửi qua
+email, người dùng tự làm. Đường thứ hai dành cho trường hợp email sai hoặc
+không dùng được: cán bộ đặt lại mật khẩu cho người đó. Quản trị viên làm được
+với mọi tài khoản, Phòng Công tác sinh viên làm được với sinh viên và phụ
+huynh, tức đúng những hồ sơ phòng này quản lý. Mỗi lần đặt lại, hệ thống thu
+hồi toàn bộ phiên đăng nhập, huỷ OTP còn hiệu lực và mở khoá nếu tài khoản
+đang bị khoá vì nhập sai; nhật ký ghi rõ ai đã đổi cho ai nhưng không lưu giá
+trị mật khẩu.
+
+Ảnh khuôn mặt và ảnh bằng chứng không nằm trong thư mục tĩnh công khai. Dịch
+vụ trả về \term{đường dẫn ảnh được ký điện tử}: máy chủ dùng khoá bí mật của
+mình tính mã xác thực HMAC-SHA256 \cite{RFC2104} trên đường dẫn và mốc hết hạn
+\FphutHetHanUrl{} phút, rồi gắn mã đó vào đường dẫn. Khi nhận yêu cầu xem ảnh,
+máy chủ tính lại và so khớp; sửa một ký tự trong đường dẫn hay dùng sau mốc
+hết hạn đều bị từ chối, nên một liên kết bị chia sẻ ra ngoài cũng tự mất hiệu
+lực.
+
+\section{Mô hình phân quyền}
+\label{sec:phanquyen}
+
+Phân quyền trong hệ thống có hai chiều. Chiều thứ nhất là \term{quyền theo
+chức năng}, dựa trên mô hình phân quyền theo vai trò \cite{Sandhu1996RBAC}: vai trò được làm gì. Chiều thứ hai là \term{phạm vi dữ liệu}: vai
+trò được thấy dữ liệu của ai. Chiều thứ hai mới là phần khó, vì cùng thao tác
+xem danh sách sinh viên, Phòng Công tác sinh viên thấy toàn trường còn cán
+bộ Khoa chỉ thấy sinh viên thuộc Khoa mình.
+
+Đọc Bảng~\ref{tab:phanquyen} theo cột, mỗi phòng ban có một nhóm chức năng rõ ràng. Phòng Đào tạo nắm
+phần tổ chức đào tạo toàn trường. Phòng Công tác sinh viên nắm hồ sơ người
+học và mọi thứ liên quan tới dữ liệu sinh trắc. Văn phòng Khoa là cánh tay
+nhập liệu của Khoa, làm cùng loại việc với Phòng Đào tạo nhưng chỉ trong Khoa
+mình. Lãnh đạo Khoa không có quyền sửa dữ liệu gốc nào, chỉ có quyền xem và
+quyền phê duyệt. Nhờ vậy người xếp lịch không tự duyệt đơn nghỉ, người duyệt
+đơn không sửa được danh sách lớp, và thao tác của cả hai đều nằm trong nhật
+ký mà lãnh đạo Khoa xem được.
+
+{\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}X cccccc@{}}
+\caption{Ma trận vai trò và chức năng của cán bộ. Ý nghĩa các ký hiệu ở
+Bảng~\ref{tab:phanquyen-gt}.}
+\label{tab:phanquyen}\\
+\toprule
+Chức năng & Quản trị & P.\,ĐT & P.\,CTSV & LĐ Khoa & VP Khoa & Ban ngành \\
+\midrule
+\endfirsthead
+\toprule
+Chức năng & Quản trị & P.\,ĐT & P.\,CTSV & LĐ Khoa & VP Khoa & Ban ngành \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Tài khoản cán bộ, đơn vị            & Sửa   & --  & --    & --     & --   & -- \\
+Đặt lại mật khẩu giảng viên, cán bộ & Sửa   & --  & --    & --     & --   & -- \\
+Đặt lại mật khẩu sinh viên, phụ huynh & Sửa & --  & Sửa   & --     & --   & -- \\
+Lớp học phần, lịch, ghi danh,
+  phân công giảng viên dạy lớp      & Sửa   & Sửa & Xem   & Xem*   & Sửa* & -- \\
+Phòng học, địa điểm điểm danh       & Sửa   & Sửa & Xem   & Xem    & Xem  & -- \\
+Hồ sơ giảng viên                    & Sửa   & Sửa & --    & Xem*   & Xem* & -- \\
+Hồ sơ sinh viên, phụ huynh          & Sửa   & Xem & Sửa   & Xem*   & Xem* & -- \\
+Ghi nhận đồng ý theo bản giấy       & Sửa   & --  & Sửa   & --     & --   & -- \\
+Duyệt khuôn mặt                     & Sửa   & --  & Sửa   & --     & --   & -- \\
+Điểm danh chi tiết và ảnh           & Sửa   & Xem & Xem   & Xem*   & Xem* & -- \\
+Duyệt nghỉ có phép                  & Duyệt & --  & Duyệt & Duyệt* & --   & -- \\
+Cảnh báo vắng, xuất Excel           & Xem   & Xem & Xem   & Xem*   & Xem* & -- \\
+Thống kê tổng hợp                   & Xem   & Xem & Xem   & Xem*   & Xem* & Xem \\
+Nhật ký hệ thống                    & Xem   & --  & --    & Xem*   & --   & -- \\
+\end{xltabular}}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.4cm} >{\raggedright\arraybackslash\leavevmode}X >{\raggedright\arraybackslash\leavevmode}p{5.0cm}@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:phanquyen}: ý nghĩa các ký hiệu.}
+\label{tab:phanquyen-gt}\\
+\toprule
+Ký hiệu & Ý nghĩa & Ví dụ trong bảng \\
+\midrule
+\endfirsthead
+\toprule
+Ký hiệu & Ý nghĩa & Ví dụ trong bảng \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Sửa & Thêm, sửa, xoá được & Phòng Đào tạo với lớp học phần \\
+Xem & Chỉ xem; không có nút sửa, gọi thẳng API sửa thì nhận lỗi 403 & Phòng Công tác sinh viên với lớp học phần \\
+Duyệt & Chỉ được chuyển Vắng thành Có phép hoặc huỷ duyệt; không sửa được trạng thái khác & Phòng Công tác sinh viên, lãnh đạo Khoa với nghỉ có phép \\
+Dấu sao & Quyền chỉ áp dụng trong Khoa của mình; dữ liệu Khoa khác không hiện ra & Văn phòng Khoa sửa lớp học phần của Khoa mình \\
+Gạch ngang & Không có quyền; mục đó không có trong menu và API trả lỗi 403 & Ban ngành với hồ sơ sinh viên \\
+Tên cột & P.\,ĐT là Phòng Đào tạo, P.\,CTSV là Phòng Công tác sinh viên, LĐ là lãnh đạo, VP là văn phòng & -- \\
+\end{xltabular}}
+
+
+Ba vai trò còn lại có phạm vi hẹp và cố định: giảng viên thao tác trên lớp
+mình dạy; sinh viên chỉ truy cập dữ liệu của chính mình; phụ huynh chỉ xem
+chuyên cần của con đã được cán bộ liên kết.
+
+\begin{ghinho}
+Phạm vi dữ liệu được cài đặt tập trung tại một mô-đun phân quyền duy nhất
+dưới dạng bộ lọc truy vấn, thay vì rải điều kiện \code{if} ở từng endpoint.
+Nhờ vậy khi thêm một vai trò mới, chỉ cần sửa một nơi, và bộ kiểm thử phân
+quyền kiểm soát được toàn bộ ma trận trên.
+\end{ghinho}
+
+Vai trò của cán bộ không nhập tay mà suy ra từ loại đơn vị khi tạo tài khoản:
+loại Phòng Đào tạo cho ra vai trò Phòng Đào tạo, và tương tự với các loại còn
+lại. Riêng đơn vị loại Khoa có hai vai trò, quản trị viên chọn văn phòng Khoa
+hoặc lãnh đạo Khoa; chọn lãnh đạo Khoa cho một đơn vị không phải Khoa sẽ bị
+từ chối. Cách này loại bỏ hẳn tình trạng gán nhầm vai trò không khớp với đơn
+vị.
+
+\section{Thiết kế luồng điểm danh}
+
+\subsection{Luồng đăng ký khuôn mặt}
+
+Trước khi được điểm danh tự động, sinh viên phải đồng ý sử dụng dữ liệu sinh
+trắc học (Mục~\ref{sec:dongy}) rồi mới đăng ký được khuôn mặt. Ảnh gửi lên đi
+qua bốn cửa: phải có đúng một khuôn mặt trong ảnh; ảnh phải đạt ngưỡng
+về kích thước khuôn mặt, độ sáng và độ nét; phải vượt kiểm tra chống giả mạo;
+và vector thu được không được quá giống vector đã duyệt của một sinh viên
+khác, cụ thể là độ tương tự không vượt \FnguongTrung. Cửa cuối cùng nhằm chặn
+tình huống một người đăng ký khuôn mặt của mình dưới hai danh tính.
+
+Vector qua được cả bốn cửa vẫn ở trạng thái \term{chờ duyệt} và chưa dùng để
+nhận diện. Cán bộ Phòng Công tác sinh viên đối chiếu ảnh rồi duyệt hoặc từ
+chối; ngay sau thao tác đó, ảnh khuôn mặt tạm bị xoá, chỉ vector ở lại.
+
+\subsection{Các trạng thái điểm danh}
+
+Một bản ghi điểm danh mang một trong năm trạng thái: \term{có mặt} khi được
+ghi nhận trong khung giờ đầu tiết; \term{muộn} khi được ghi nhận sau giờ bắt
+đầu quá \FphutMuon{} phút; \term{vắng} do hệ thống sinh ra lúc đóng phiên;
+\term{xác nhận tay} khi giảng viên tự đánh dấu; và \term{có phép} khi Phòng
+Công tác sinh viên hoặc lãnh đạo Khoa duyệt đơn nghỉ. Chỉ trạng thái vắng
+không phép mới tính vào tỉ lệ cảnh báo cấm thi.
+
+\subsection{Vòng đời một phiên điểm danh}
+
+Phiên điểm danh là trung tâm của nghiệp vụ. Hình~\ref{fig:vongdoiphien} mô tả
+vòng đời của nó.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.0cm and 1.0cm, every node/.append style={align=center}]
+  \node (mo)    [startstop] {Mở phiên\\ \scriptsize sớm nhất \FphutMoSom{} phút trước tiết};
+  \node (nhan)  [process, right=of mo, xshift=0.5cm] {Nhận điểm danh\\ \scriptsize camera, tự chụp, tay};
+  \node (han)   [decision, right=of nhan, xshift=0.8cm] {Quá hạn nhận?};
+  \node (dong)  [process, below=of han] {Đóng phiên};
+  \node (vang)  [startstop, left=of dong, xshift=-0.8cm] {Sinh bản ghi vắng\\ \scriptsize và cảnh báo};
+  \draw [flowarr] (mo)   -- (nhan);
+  \draw [flowarr] (nhan) -- (han);
+  \draw [flowarr] (han)  -- node[right, font=\scriptsize] {có} (dong);
+  \draw [flowarr] (han.north) to[out=60, in=20, looseness=2.2]
+        node[right, font=\scriptsize] {chưa} (nhan.north east);
+  \draw [flowarr] (dong) -- (vang);
+\end{tikzpicture}
+\caption{Vòng đời của một phiên điểm danh.}
+\label{fig:vongdoiphien}
+\end{figure}
+
+Phiên chỉ mở được trong khoảng từ \FphutMoSom{} phút trước giờ bắt đầu tiết
+tới giờ kết thúc. Sau giờ kết thúc \FphutAnHan{} phút, hệ thống ngừng nhận
+điểm danh và tự động đóng phiên nếu giảng viên quên. Khi đóng, mọi sinh viên
+đã ghi danh mà chưa có bản ghi sẽ được ghi nhận vắng, đồng thời hệ thống tính
+lại tỉ lệ vắng và phát cảnh báo cho những sinh viên vừa vượt ngưỡng
+\FtiLeCanhBao\%.
+
+\subsection{Nhận diện một khung hình}
+
+Giải thuật~\ref{alg:nhandien} mô tả xử lý phía máy chủ khi giảng viên gửi lên
+một khung hình từ camera.
+
+\begin{algorithm}[H]
+\caption{Nhận diện điểm danh từ một khung hình của lớp}
+\label{alg:nhandien}
+\hspace*{\algorithmicindent}\textbf{Đầu vào:} ảnh $I$, mã lớp $c$, ngưỡng $\tau = \FnguongNhanDien$\\
+\hspace*{\algorithmicindent}\textbf{Đầu ra:} danh sách danh tính nhận được kèm độ tin cậy
+\begin{algorithmic}[1]
+\Function{NhanDienKhungHinh}{$I$, $c$}
+  \State $F \gets$ \Call{PhatHienKhuonMat}{$I$}
+  \State $R \gets \emptyset$
+  \ForAll{$f \in F$}
+    \State $(that, diem) \gets$ \Call{KiemTraSuSong}{$I$, $f$}
+    \State $e \gets$ \Call{TrichDacTrung}{$I$, $f$}
+    \State $(s, d) \gets$ láng giềng gần nhất của $e$ trong các vector
+           \textbf{đã duyệt} của sinh viên thuộc lớp $c$ \textbf{và đã đồng
+           ý} sinh trắc học \label{ln:lanhgieng}
+    \State $conf \gets 1 - d$
+    \If{$conf \geq \tau$ \textbf{và} $that$}
+      \State $R \gets R \cup \{(s, conf)\}$
+    \Else
+      \State $R \gets R \cup \{(\textsc{Null}, conf)\}$
+           \Comment{ghi nhận để giảng viên biết có người chưa nhận ra}
+    \EndIf
+  \EndFor
+  \State \Return $R$
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+Ba chi tiết quan trọng nằm ở dòng~\ref{ln:lanhgieng}. Thứ nhất, phép tìm
+láng giềng chỉ chạy trên sinh viên thuộc lớp đang điểm danh, nên một sinh viên
+lớp khác đi ngang qua camera không bao giờ bị điểm danh nhầm. Thứ hai, chỉ
+những vector đã được cán bộ duyệt mới tham gia so khớp; vector đang chờ duyệt
+không đủ tin cậy để làm căn cứ. Thứ ba, sinh viên chưa đồng ý hoặc đã rút đồng
+ý không bao giờ được nhận ra, kể cả khi vì lý do nào đó vector cũ còn sót lại
+trong cơ sở dữ liệu.
+
+\subsection{Sinh viên tự điểm danh}
+
+Ngoài luồng giảng viên quét camera, sinh viên có thể tự điểm danh bằng ảnh tự
+chụp kèm toạ độ GPS, và nếu giảng viên yêu cầu thì kèm cả mã QR đang chiếu
+trong phòng. Luồng này rủi ro hơn hẳn, nên bị siết bằng các điều kiện mô tả
+trong Giải thuật~\ref{alg:tudiemdanh}.
+
+\begin{algorithm}[H]
+\caption{Sinh viên tự điểm danh bằng ảnh tự chụp và vị trí}
+\label{alg:tudiemdanh}
+\hspace*{\algorithmicindent}\textbf{Đầu vào:} ảnh $I$, sinh viên $s$, phiên $p$, mã QR $q$, toạ độ $(lat, lon)$, sai số $a$\\
+\hspace*{\algorithmicindent}\textbf{Đầu ra:} chấp nhận hoặc lý do từ chối
+\begin{algorithmic}[1]
+\Function{TuDiemDanh}{$I$, $s$, $p$, $q$, $lat$, $lon$, $a$}
+  \If{$s$ chưa ghi danh vào lớp của $p$ \textbf{hoặc} $p$ đã quá hạn nhận}
+    \State \Return \textsc{TuChoi}
+  \EndIf
+  \If{$s$ chưa đồng ý sử dụng dữ liệu sinh trắc học} \label{ln:dongy}
+    \State \Return \textsc{CanDongY} \Comment{giảng viên vẫn xác nhận tay được}
+  \EndIf
+  \If{$p$ yêu cầu mã QR \textbf{và} $q$ không khớp khung giờ hiện tại hay liền trước} \label{ln:qr}
+    \State \Return \textsc{TuChoi}
+  \EndIf
+  \State $L \gets$ vùng của phòng học, nếu không có thì khu vực chứa phòng, rồi tới địa điểm mặc định
+  \If{$L \neq \textsc{Null}$}
+    \If{vị trí bị giả lập \textbf{hoặc} $a > \FsaiSoGps$ mét}
+      \State \Return \textsc{TuChoi}
+    \EndIf
+    \State $dist \gets$ \Call{Haversine}{$lat$, $lon$, $L.lat$, $L.lon$}
+    \If{$dist - a > L.banKinh$}
+      \State \Return \textsc{TuChoi} \Comment{đang ở ngoài phạm vi cho phép}
+    \EndIf
+  \EndIf
+  \State $(trangThai, conf) \gets$ so khớp $I$ \textbf{chỉ với} vector đã
+         duyệt của chính $s$ \label{ln:chinhminh}
+  \If{$trangThai \neq \textsc{Khop}$}
+    \State \Return \textsc{TuChoi}
+  \EndIf
+  \State ghi bản ghi điểm danh với nguồn \textsc{selfie}, kèm $dist$ và ảnh bằng chứng
+  \State \Return \textsc{ChapNhan}
+\EndFunction
+\end{algorithmic}
+\end{algorithm}
+
+Điểm khác biệt cốt yếu so với luồng camera nằm ở dòng~\ref{ln:chinhminh}:
+ảnh tự chụp chỉ được so khớp với vector của chính sinh viên đang đăng nhập,
+chứ không so với cả lớp. Nếu so với cả lớp, một sinh viên có thể chụp ảnh bạn
+mình và hệ thống vẫn tìm ra một danh tính hợp lệ. Dòng~\ref{ln:dongy} trả về
+một kết quả riêng thay vì từ chối chung chung, để ứng dụng đưa sinh viên tới
+màn hình đọc nội dung đồng ý thay vì để sinh viên chụp lại mãi.
+
+Khoảng cách tới địa điểm được tính bằng công thức Haversine trên mặt cầu \cite{Sinnott1984Haversine}:
+
+\begin{equation}
+\label{eq:haversine}
+d = 2R \arcsin \sqrt{ \sin^2\!\left(\frac{\Delta\varphi}{2}\right)
++ \cos\varphi_1 \cos\varphi_2 \sin^2\!\left(\frac{\Delta\lambda}{2}\right) }
+\end{equation}
+
+trong đó $\varphi$ là vĩ độ, $\lambda$ là kinh độ và $R$ là bán kính Trái
+Đất. Vì GPS trong nhà có sai số hàng chục mét \cite{Zandbergen2011Positional}, hệ thống trừ đi sai số do thiết
+bị báo lên trước khi so với bán kính.
+
+Vùng đối chiếu $L$ được chọn từ hẹp tới rộng. Nếu phòng học của lịch có toạ
+độ riêng thì dùng toạ độ đó, với bán kính không nhỏ hơn \FbanKinhPhong\,m để
+không chặn oan sinh viên đang ngồi đúng lớp. Nếu phòng chưa có toạ độ thì dùng
+khu vực chứa phòng, sau cùng mới tới địa điểm mặc định của trường. Danh mục
+phòng học còn giúp chặn xếp hai lớp vào cùng một phòng trong cùng khung giờ
+ngay khi nhập lịch.
+
+\subsection{Mã QR điểm danh xoay vòng}
+
+Toạ độ GPS do thiết bị gửi lên nên vẫn có thể bị làm giả. Với những buổi cần
+chắc chắn, giảng viên bật yêu cầu mã QR khi mở phiên và chiếu mã lên màn hình
+trong phòng \cite{ISO18004}. Mã được ký điện tử bằng HMAC \cite{RFC2104} trên mã phiên và số thứ tự khung thời gian
+\FgiayDoiQr{} giây, nên tự đổi sau mỗi \FgiayDoiQr{} giây và chỉ máy chủ sinh
+ra được, theo cùng ý tưởng với mật khẩu một lần dựa trên thời gian
+\cite{RFC6238}. Máy chủ chấp nhận mã của khung hiện tại và khung liền trước, tức một
+mã sống không quá hai khung. Ảnh chụp mã gửi cho bạn ở nhà vì thế hết hạn trước
+khi kịp dùng. Kèm theo mã QR là một mã sáu chữ số sinh cùng cách, để sinh viên
+có máy ảnh hỏng vẫn gõ tay được.
+
+Ảnh QR chứa một đường link tới trang tự điểm danh của đúng buổi, kèm sẵn mã,
+nên sinh viên quét bằng camera thường của điện thoại là vào thẳng trang đó mà
+không phải mở ứng dụng rồi tìm mục quét mã. Nếu chưa đăng nhập, sinh viên đăng
+nhập xong sẽ quay lại đúng trang này. Trong lúc mã đang được chiếu, màn hình
+quét camera của giảng viên tự dừng nhận diện để webcam không ghi điểm danh cho
+người ngồi trước máy.
+
+\subsection{Thông báo cho phụ huynh}
+
+Mỗi khi bản ghi điểm danh của sinh viên được tạo hoặc đổi trạng thái, kể cả
+khi đóng phiên sinh ra bản ghi vắng, hệ thống tạo thông báo cho từng phụ huynh
+đã liên kết ngay trong cùng giao dịch ghi điểm danh, nên không có bản ghi nào
+thiếu thông báo. Thông báo nằm trong hộp thư của ứng dụng; nếu phụ huynh bật
+nhận email thì thông báo còn được đưa vào hàng đợi, một vòng lặp nền gửi đi, mỗi
+thư được thử tối đa \FsoLanGuiEmail{} lần nếu máy chủ thư lỗi. Phụ huynh tự
+chọn có nhận thông báo có mặt hay không; thông báo vắng, đi muộn và các lần
+sửa kết quả thì luôn được gửi.
+
+\section{Các lớp phòng vệ chống gian lận}
+\label{sec:baolop}
+
+Không lớp phòng vệ nào là tuyệt đối, nên hệ thống xếp chồng sáu lớp, theo tinh
+thần nguyên tắc tách đặc quyền \en{(separation of privilege)}
+\cite{Saltzer1975Protection}. Một
+hành vi gian lận phải vượt qua toàn bộ mới thành công.
+
+\begin{table}[H]
+\centering
+\caption{Sáu lớp phòng vệ và kiểu tấn công mà mỗi lớp ngăn chặn.}
+\label{tab:phongve}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{4.2cm} X@{}}
+\toprule
+Lớp phòng vệ & Ngăn kiểu gian lận \\
+\midrule
+Kiểm tra chất lượng ảnh & Ảnh quá mờ, quá tối hoặc khuôn mặt quá nhỏ, vốn là
+  điều kiện dễ khiến mô hình nhận nhầm \\
+Chống giả mạo MiniFASNetV2 & Giơ ảnh in hoặc ảnh trên màn hình điện thoại
+  trước camera \\
+Xác nhận \FsoKhungXacNhan{} khung hình & Một khung hình may mắn vượt ngưỡng
+  do góc chụp hoặc ánh sáng bất lợi \\
+So khớp theo phạm vi & Nhận nhầm người không thuộc lớp; ở luồng tự điểm danh
+  là chụp hộ bạn cùng lớp \\
+Đối chiếu GPS theo phòng học & Điểm danh từ nhà hoặc từ toà nhà khác \\
+Mã QR xoay vòng \FgiayDoiQr{} giây và quyền của giảng viên & Chụp mã gửi cho
+  bạn ở xa; mọi trường hợp còn lại đều có thể bị giảng viên sửa lại kèm lý do \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{5.2cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:phongve}: mỗi lớp được cài đặt ở đâu và xử lý thế nào khi không vượt qua.}
+\label{tab:phongve-gt}\\
+\toprule
+Lớp phòng vệ & Cài đặt và tham số & Khi không vượt qua \\
+\midrule
+\endfirsthead
+\toprule
+Lớp phòng vệ & Cài đặt và tham số & Khi không vượt qua \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Chất lượng ảnh & \code{face\_service.py}, áp dụng khi đăng ký khuôn mặt: cạnh mặt tối thiểu 112 điểm ảnh, độ sáng trung bình tối thiểu 40, độ nét theo phương sai Laplace tối thiểu 60 & Ảnh đăng ký bị từ chối kèm lý do, sinh viên chụp lại \\
+Chống giả mạo & \code{antispoof\_service.py}, mô hình MiniFASNetV2; điểm mặt thật tối thiểu \FnguongThat & Khung hình bị đánh dấu nghi giả mạo, không ghi điểm danh \\
+Xác nhận đa khung hình & Endpoint nhận diện của phiên trong \code{sessions.py}; cần \FsoKhungXacNhan{} lần nhận ra & Chưa tạo bản ghi cho tới khi đủ số lần \\
+So khớp theo phạm vi & \code{face\_service.py}: chỉ xét sinh viên ghi danh của lớp, khuôn mặt đã duyệt, đã đồng ý; ngưỡng \FnguongNhanDien & Không trả về danh tính nào \\
+GPS theo phòng học & \code{geo\_service.py}: sai số tối đa \FsaiSoGps{}\,m, bán kính phòng tối thiểu \FbanKinhPhong{}\,m & Từ chối với lý do riêng: ngoài vùng, sai số lớn hoặc vị trí giả lập \\
+Mã QR và quyền giảng viên & \code{checkin\_code\_service.py}: đổi mã mỗi \FgiayDoiQr{} giây, nhận mã của khung hiện tại và khung liền trước & Từ chối khi thiếu hoặc sai mã; mọi trường hợp lọt qua vẫn có thể bị giảng viên sửa kèm lý do \\
+\end{xltabular}}
+
+\section{Thiết kế bảo vệ dữ liệu sinh trắc}
+
+\subsection{Đồng ý sử dụng dữ liệu sinh trắc học là bắt buộc}
+\label{sec:dongy}
+
+Dữ liệu khuôn mặt là dữ liệu cá nhân nhạy cảm \cite{Luat912025, ND3562025}, nên hệ thống coi sự đồng ý của
+sinh viên là điều kiện bắt buộc, được kiểm tra ở mọi điểm xử lý chứ không chỉ
+hiện một hộp thoại cho có:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Đồng ý với một nội dung cụ thể.} Nội dung đồng ý nằm ở máy chủ
+        và có phiên bản, hiện tại là \code{\FphienBanDongY}. Nội dung nêu rõ thu
+        thập gì, để làm gì, giữ bao lâu, ai được xem và cách rút đồng ý. Khi
+        xác nhận, ứng dụng gửi kèm phiên bản sinh viên đã đọc; nếu nội dung
+        vừa đổi, máy chủ từ chối và ứng dụng hiện lại nội dung mới. Khi nhà
+        trường sửa nội dung, sinh viên đã đồng ý bản cũ được nhắc đọc và xác
+        nhận lại.
+  \item \textbf{Hai cách ghi nhận, không có cách đồng ý thay.} Sinh viên tự
+        tick và xác nhận trong ứng dụng; hoặc sinh viên ký bản giấy, cán bộ
+        Phòng Công tác sinh viên nhập lại và hệ thống lưu tên người nhập. Cán
+        bộ không thể đồng ý thay khi không có bản giấy.
+  \item \textbf{Chưa đồng ý thì không xử lý.} Không đăng ký được khuôn mặt,
+        không được nhận ra khi giảng viên quét camera, và không tự điểm danh
+        được. Quyền học tập không bị ảnh hưởng: giảng viên vẫn xác nhận có
+        mặt trực tiếp.
+  \item \textbf{Rút đồng ý là xoá ngay.} Sinh viên tự rút trong ứng dụng, hoặc
+        Phòng Công tác sinh viên làm thay khi sinh viên nộp đơn; toàn bộ ảnh và
+        vector khuôn mặt bị xoá trong cùng thao tác. Mỗi lần đồng ý, rút đồng
+        ý đều được ghi vào nhật ký hệ thống.
+\end{itemize}
+
+\subsection{Tối thiểu hoá và quyền kiểm soát dữ liệu}
+
+Hai nguyên tắc còn lại chi phối cách hệ thống lưu dữ liệu khuôn mặt, tương ứng
+với nguyên tắc tối thiểu hoá dữ liệu và quyền của chủ thể dữ liệu trong
+\cite{GDPR2016}:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Chỉ giữ thứ tối thiểu.} Thứ lưu lâu dài là vector đặc trưng,
+        không phải ảnh. Ảnh khuôn mặt chỉ được giữ tạm để cán bộ đối chiếu
+        khi duyệt và bị xoá ngay sau khi duyệt hoặc từ chối. Ảnh bằng chứng
+        điểm danh tự xoá sau \FngayLuuAnh{} ngày.
+  \item \textbf{Người dùng kiểm soát được dữ liệu của mình.} Sinh viên xem
+        được danh sách dữ liệu khuôn mặt đã đăng ký của mình và rút đồng ý,
+        tức xoá toàn bộ, bất cứ lúc nào.
+\end{itemize}
+
+\begin{luuy}
+Vector đặc trưng không phải là dạng ẩn danh tuyệt đối: đã có công trình dựng
+lại được ảnh khuôn mặt từ vector đặc trưng \cite{Mai2019Reconstruction}. Vì vậy hệ thống vẫn
+coi bảng \code{face\_embeddings} là dữ liệu nhạy cảm: không endpoint nào trả
+vector ra ngoài, và mọi truy cập đều đi qua lớp phân quyền.
+\end{luuy}
+
+\section{Nhật ký hệ thống}
+\label{sec:nhatky}
+
+Nhật ký sửa điểm danh ở bảng \code{attendance\_audits} chỉ trả lời được ai
+đã sửa kết quả điểm danh. Để trả lời câu hỏi rộng hơn là ai đã làm gì trên hệ
+thống, bảng \code{audit\_logs} ghi lại ba nhóm sự kiện, theo hướng dẫn quản lý nhật ký an toàn thông tin \cite{Kent2006NIST}:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Đăng nhập và đăng xuất}, gồm cả lần đăng nhập sai và lần thử
+        khi tài khoản đang bị khoá tạm, kèm địa chỉ IP.
+  \item \textbf{Mọi thao tác thêm, sửa, xoá} trên tài khoản, đơn vị, cán bộ,
+        sinh viên, giảng viên, phụ huynh, lớp học phần, ghi danh, lịch học,
+        phòng học, địa điểm, dữ liệu khuôn mặt, phiên và kết quả điểm danh.
+        Một số thay đổi mang tên riêng cho dễ đọc như đổi mật khẩu, đồng ý
+        hay rút đồng ý sinh trắc học, duyệt khuôn mặt, mở và đóng phiên.
+  \item \textbf{Xuất báo cáo Excel}, vì đây là lúc dữ liệu cá nhân rời khỏi
+        hệ thống.
+\end{itemize}
+
+Mỗi dòng nhật ký lưu người thao tác, vai trò, thời điểm, hành động, đối
+tượng, kết quả và phần thay đổi dưới dạng cặp giá trị cũ, giá trị mới của
+từng trường.
+
+\begin{ghinho}
+Nhật ký được ghi tự động ở tầng ánh xạ đối tượng: một hàm lắng nghe sự kiện
+\code{after\_flush} của SQLAlchemy đọc mọi đối tượng vừa thêm, sửa, xoá trong
+giao dịch và ghi nhật ký vào chính giao dịch đó. Vì vậy không endpoint nào
+quên ghi được, và nếu giao dịch bị huỷ thì dòng nhật ký cũng huỷ theo, không
+có nhật ký cho thao tác chưa từng xảy ra.
+\end{ghinho}
+
+Ba chi tiết giữ cho nhật ký dùng được trong thực tế. Thứ nhất, các trường
+nhạy cảm như mật khẩu đã băm, vector khuôn mặt hay mã OTP chỉ được ghi là
+\emph{đã thay đổi}, không bao giờ ghi giá trị. Thứ hai, việc tạo bản ghi điểm
+danh khi sinh viên được nhận diện là luồng bình thường, xảy ra hàng nghìn lần
+mỗi ngày, nên không ghi; chỉ những lần có người sửa kết quả mới được ghi.
+Thứ ba, Khoa liên quan được chốt ngay lúc ghi, nên lãnh đạo Khoa chỉ thấy
+thao tác trên dữ liệu thuộc Khoa mình, và kết quả không đổi kể cả khi đối
+tượng sau này bị xoá hoặc chuyển Khoa.

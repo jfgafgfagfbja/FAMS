@@ -1,0 +1,36 @@
+% ---------------------------------------------------------------------
+%  TÓM TẮT
+% ---------------------------------------------------------------------
+\begin{abstract}
+
+Điểm danh thủ công ở giảng đường đại học vừa tốn thời gian của mỗi tiết
+học, vừa không ngăn được tình trạng điểm danh hộ, và số liệu chuyên cần
+thường chỉ tổng hợp được vào cuối kỳ, khi đã quá muộn để nhắc nhở sinh viên
+sắp chạm ngưỡng cấm thi. Đồ án xây dựng FAMS \en{(Face Attendance Management
+System)}, một hệ thống quản lý sinh viên tích hợp điểm danh bằng nhận diện
+khuôn mặt, dùng được cho cả nhà trường lẫn sinh viên và phụ huynh.
+
+Hệ thống nhận diện khuôn mặt theo hướng so khớp đặc trưng: bộ dò SCRFD tìm
+khuôn mặt trong khung hình, mô hình ArcFace chuyển mỗi khuôn mặt thành vector
+\FchieuVector{} chiều đã chuẩn hoá, và danh tính được xác định bằng khoảng
+cách cosine tới các vector đã đăng ký, có chỉ mục HNSW của pgvector hỗ trợ
+tìm kiếm. Cách này cho phép thêm một sinh viên mới chỉ bằng một ảnh, không
+phải huấn luyện lại mô hình. Để chống gian lận, hệ thống kiểm tra ảnh in và
+ảnh chụp lại màn hình bằng MiniFASNetV2, yêu cầu nhận diện đúng
+\FsoKhungXacNhan{} khung hình mới ghi nhận, và đối chiếu toạ độ GPS khi sinh
+viên tự điểm danh bằng ảnh tự chụp.
+
+Sản phẩm gồm một dịch vụ FastAPI với \FsoEndpoint{} endpoint trên
+\FsoBang{} bảng dữ liệu PostgreSQL, một ứng dụng Flutter dùng chung cho Web,
+Android và iOS với \FsoManHinh{} màn hình, phân quyền cho \FsoVaiTro{} vai
+trò từ quản trị viên, phòng ban, giảng viên đến sinh viên và phụ huynh. Bộ
+kiểm thử tự động gồm \FsoTest{} ca chạy trên PostgreSQL thật. Kết quả cho
+thấy một hệ thống điểm danh bằng khuôn mặt có thể chạy trên máy chủ không
+GPU, đồng thời khẳng định rằng phần khó nhất của bài toán không nằm ở mô
+hình nhận diện, mà ở các lớp phòng vệ quanh nó.
+
+\vspace{0.8em}
+\noindent\textbf{Từ khoá:} nhận diện khuôn mặt, ArcFace, chống giả mạo
+khuôn mặt, tìm kiếm vector, điểm danh tự động.
+
+\end{abstract}

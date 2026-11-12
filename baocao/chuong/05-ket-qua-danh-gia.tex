@@ -1,0 +1,355 @@
+% ---------------------------------------------------------------------
+%  CHƯƠNG 5 — KẾT QUẢ, ĐÁNH GIÁ VÀ KẾT LUẬN
+% ---------------------------------------------------------------------
+\chapter{Kết quả, đánh giá và kết luận}
+\label{ch:ketqua}
+
+\begin{muctieu}
+Chương này đối chiếu sản phẩm thu được với từng mục tiêu đặt ra ở
+Chương~\ref{ch:modau}, trình bày kết quả kiểm thử tự động, cách đo và kết
+quả đo hiệu năng, bàn luận về những điểm hệ
+thống làm được và chưa làm được, rồi tổng kết đồ án, nêu đóng góp chính và
+các hướng phát triển tiếp theo.
+\end{muctieu}
+
+\section{Đối chiếu với mục tiêu ban đầu}
+
+\begin{table}[H]
+\centering
+\caption{Mức độ hoàn thành từng mục tiêu nêu ở Mục~\ref{sec:muctieu}.}
+\label{tab:doichieumuctieu}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}c >{\raggedright\arraybackslash}p{2.2cm} X@{}}
+\toprule
+Mục tiêu & Kết quả & Bằng chứng \\
+\midrule
+MT1 & Đạt & Quy trình đăng ký và nhận diện chạy trọn vẹn trên ONNX Runtime
+  bản CPU, không cần GPU. Thời gian xử lý đo được nêu ở
+  Bảng~\ref{tab:hieunang} \\
+MT2 & Đạt & Sáu lớp phòng vệ ở Bảng~\ref{tab:phongve} đều đã cài đặt và có
+  kiểm thử tự động tương ứng \\
+MT3 & Đạt & \FsoEndpoint{} endpoint trên \FsoBang{} bảng dữ liệu phủ hết
+  vòng đời từ hồ sơ tới báo cáo, có nhật ký sửa điểm danh, nhật ký hệ thống,
+  thông báo cho phụ huynh và xuất Excel \\
+MT4 & Đạt & Ma trận vai trò và chức năng ở Bảng~\ref{tab:phanquyen}, gồm cả
+  việc tách văn phòng Khoa với lãnh đạo Khoa, được cài đặt tập trung và kiểm
+  chứng bằng nhóm kiểm thử phân quyền \\
+MT5 & Đạt & Một mã nguồn Flutter với \FsoManHinh{} màn hình chạy trên Web,
+  Android, iOS; \FsoTest{} ca kiểm thử tự động chạy trên PostgreSQL thật \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.0cm} >{\raggedright\arraybackslash\leavevmode}p{5.6cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:doichieumuctieu}: mỗi mục tiêu được kiểm chứng ở đâu.}
+\label{tab:doichieumuctieu-gt}\\
+\toprule
+Mục tiêu & Yêu cầu tóm tắt & Kiểm chứng tại \\
+\midrule
+\endfirsthead
+\toprule
+Mục tiêu & Yêu cầu tóm tắt & Kiểm chứng tại \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+MT1 & Nhận diện trọn vẹn trên máy chỉ có CPU, đủ nhanh để dùng trong lớp & Bảng~\ref{tab:hieunang} và Mục~\ref{sec:hieunang}; khung đông người còn chậm, ghi ở phần hạn chế \\
+MT2 & Chống ảnh in hoặc màn hình, chống nhận nhầm do một khung xấu, chống điểm danh từ xa & Bảng~\ref{tab:phongve} và các tệp kiểm thử tương ứng ở Bảng~\ref{tab:kiemthu}; hiệu quả chặn ngoài thực tế chưa đo \\
+MT3 & Số hoá trọn nghiệp vụ chuyên cần & Bảng~\ref{tab:api} và Bảng~\ref{tab:luocdo} \\
+MT4 & Phân quyền đúng mô hình tổ chức & Bảng~\ref{tab:phanquyen} và các tệp kiểm thử phân quyền \\
+MT5 & Một ứng dụng cho ba nền tảng, có kiểm thử tự động & Bảng~\ref{tab:manhinh} và Bảng~\ref{tab:kiemthu} \\
+Cột Kết quả & Đạt nghĩa là có bằng chứng kiểm chứng được nêu ở cột cuối & Những điểm còn thiếu ghi ở mục hạn chế của chương này \\
+\end{xltabular}}
+
+\section{Kết quả kiểm thử tự động}
+
+Bộ kiểm thử viết bằng pytest gồm \FsoTest{} ca trong \FsoFileTest{} tệp, khoảng
+\FsoDongTest{} dòng mã kiểm thử. Bảng~\ref{tab:kiemthu} liệt kê từng nhóm.
+
+{\scriptsize
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash\leavevmode}p{5.6cm} >{\centering\arraybackslash}p{1.3cm} X@{}}
+\caption{Các nhóm kiểm thử tự động của phía máy chủ.}
+\label{tab:kiemthu}\\
+\toprule
+Tệp kiểm thử & Số ca & Nội dung kiểm \\
+\midrule
+\endfirsthead
+\toprule
+Tệp kiểm thử & Số ca & Nội dung kiểm \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\BangTest
+\end{xltabular}}
+
+{\footnotesize
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{6.4cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:kiemthu}: các tệp kiểm thử theo nhóm rủi ro.}
+\label{tab:kiemthu-gt}\\
+\toprule
+Nhóm & Tệp & Rủi ro được chặn \\
+\midrule
+\endfirsthead
+\toprule
+Nhóm & Tệp & Rủi ro được chặn \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Xác thực, phiên đăng nhập & \code{test\_auth}, \code{test\_tokens\_and\_media}, \code{test\_password\_reset}, \code{test\_change\_password}, \code{test\_manager\_reset\_password} & Lộ tài khoản, token bị đánh cắp được dùng lại \\
+Phân quyền & \code{test\_authorization}, \code{test\_unit\_roles}, \code{test\_admin\_management}, \code{test\_admin\_crud} & Xem hoặc sửa dữ liệu ngoài phạm vi của vai trò \\
+Nhận diện, chống gian lận & \code{test\_antispoof}, \code{test\_confirm\_frames}, \code{test\_location\_checkin}, \code{test\_checkin\_qr}, \code{test\_consent}, \code{test\_face\_approval} & Điểm danh hộ, xử lý dữ liệu sinh trắc khi chưa có đồng ý \\
+Vòng đời điểm danh & \code{test\_open\_session\_rules}, \code{test\_session\_lifecycle}, \code{test\_session\_detail\_and\_records}, \code{test\_rooms}, \code{test\_week\_schedule} & Mở phiên sai giờ, xếp trùng phòng, thiếu bản ghi vắng \\
+Báo cáo, thông báo, nhật ký & \code{test\_reports}, \code{test\_reports\_export\_and\_warnings}, \code{test\_my\_attendance\_detail}, \code{test\_parent\_notifications}, \code{test\_audit\_log}, \code{test\_evidence\_cleanup} & Số liệu sai, quên báo phụ huynh, thiếu dấu vết thao tác \\
+Lỗi đã gặp & \code{test\_flow\_fixes} & Lỗi đã sửa quay trở lại \\
+Cách đếm & -- & Số ca là số hàm kiểm thử trong tệp, đếm tự động; kiểm thử của ứng dụng Flutter chạy riêng bằng \code{flutter test}, không tính vào bảng \\
+\end{xltabular}}
+
+Ba quyết định về cách kiểm thử đáng được nêu rõ:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Chạy trên PostgreSQL thật, không dùng cơ sở dữ liệu nhúng.}
+        Kiểu \code{Vector(\FchieuVector)} và toán tử khoảng cách của pgvector
+        không có tương đương trong SQLite, nên nếu kiểm thử bằng cơ sở dữ
+        liệu nhúng thì đúng phần quan trọng nhất lại không được kiểm.
+  \item \textbf{Mỗi ca chạy trong một giao dịch rồi quay lui.} Nhờ vậy các ca
+        không ảnh hưởng lẫn nhau mà không phải dựng lại lược đồ mỗi lần.
+  \item \textbf{Giảm số vòng băm mật khẩu khi kiểm thử.} Bcrypt cố tình chậm \cite{Provos1999Bcrypt};
+        hạ số vòng trong môi trường kiểm thử giúp bộ kiểm thử chạy nhanh mà
+        không đổi logic nghiệp vụ.
+\end{itemize}
+
+Kết quả lần chạy gần nhất: toàn bộ \FsoTest{} ca đều đạt, thời gian chạy
+39,56 giây (\code{278 passed in 39.56s}), thực hiện ngày 12/11/2026 trên
+PostgreSQL 16 chạy trong Docker.
+
+\section{Đánh giá hiệu năng}
+\label{sec:hieunang}
+
+\subsection{Cách đo}
+
+Hiệu năng được đo ở ba điểm tách biệt: thời gian phát hiện và trích đặc trưng
+một khung hình, thời gian truy vấn so khớp trong cơ sở dữ liệu, và thời gian
+xử lý trọn vẹn một yêu cầu nhận diện tính từ lúc máy chủ nhận khung hình. Mỗi
+phép đo lặp lại \HnSoLan{} lần, bỏ lần chạy đầu tiên vì lần đó còn phải nạp mô
+hình, rồi lấy trung vị thay cho trung bình để giảm ảnh hưởng của các lần chạy
+bất thường.
+
+Phép đo do công cụ \code{backend/tools/do\_hieu\_nang.py} thực hiện ngày
+\HnNgayDo{} trên máy thử nghiệm ở Bảng~\ref{tab:moitruong}. Vì chưa có ảnh
+chụp bằng thiết bị sẽ dùng khi bảo vệ, phép đo dùng ảnh mẫu đi kèm thư viện
+InsightFace: ảnh nhóm \code{t1.jpg} kích thước 1280$\times$886 có \HnSoMat{}
+khuôn mặt, và một khung 640$\times$480 cắt từ chính ảnh đó, chứa đúng một khuôn
+mặt. Phép truy vấn chạy trên cơ sở dữ liệu thử nghiệm có \HnSoVector{} vector
+khuôn mặt. Công cụ ghi thẳng kết quả vào bảng dưới đây và vào các con số trong
+phần nhận xét, nên số trong báo cáo là số máy in ra chứ không phải số chép tay.
+
+\begin{table}[H]
+\centering
+\caption{Kết quả đo hiệu năng trên máy thử nghiệm.}
+\label{tab:hieunang}
+\small
+\begin{tabularx}{\textwidth}{@{}X >{\centering\arraybackslash}p{3.0cm} >{\centering\arraybackslash}p{3.0cm}@{}}
+\toprule
+Phép đo & Trung vị & Lớn nhất \\
+\midrule
+\BangHieuNang
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.8cm} >{\raggedright\arraybackslash\leavevmode}X >{\raggedright\arraybackslash\leavevmode}p{4.6cm}@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:hieunang}: mỗi phép đo gồm những gì.}
+\label{tab:hieunang-gt}\\
+\toprule
+Phép đo & Gồm những bước & Đầu vào \\
+\midrule
+\endfirsthead
+\toprule
+Phép đo & Gồm những bước & Đầu vào \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Một khuôn mặt & Chạy cả bộ mô hình đang nạp: phát hiện, ba mô hình phụ, trích đặc trưng & Khung 640$\times$480 cắt từ ảnh mẫu, đúng một khuôn mặt \\
+Nhiều khuôn mặt & Như trên, trên cả ảnh nhóm & Ảnh mẫu \code{t1.jpg} 1280$\times$886, \HnSoMat{} khuôn mặt \\
+Truy vấn so khớp & Một câu SQL tìm vector gần nhất bằng toán tử cosine của pgvector & Cơ sở dữ liệu thử nghiệm có \HnSoVector{} vector; vector truy vấn ngẫu nhiên \\
+Chống giả mạo & Cắt vùng mặt mở rộng 2,7 lần, đưa về 80$\times$80, chạy MiniFASNetV2 & Khuôn mặt trong khung một khuôn mặt \\
+Trọn vẹn một yêu cầu & Hàm \code{recognize\_frame} mà endpoint quét camera gọi: giải mã ảnh, chạy mô hình, chống giả mạo, so khớp trong phạm vi lớp; không gồm thời gian truyền mạng & Khung một khuôn mặt, lớp học phần đầu tiên trong cơ sở dữ liệu \\
+Trung vị, lớn nhất & Trung vị và lần chậm nhất trong \HnSoLan{} lần đo, đã bỏ lần đầu vì lần đó còn nạp mô hình & -- \\
+\end{xltabular}}
+
+
+\subsection{Nhận xét về hiệu năng}
+
+Gần như toàn bộ thời gian nằm ở phần chạy mô hình. Phát hiện và trích đặc
+trưng một khuôn mặt mất \HnMotMat{}\,ms, trong khi kiểm tra chống giả mạo chỉ
+mất \HnChongGiaMao{}\,ms và truy vấn so khớp \HnTruyVan{}\,ms. Con số truy vấn
+nhỏ một phần vì cơ sở dữ liệu thử nghiệm ít dữ liệu; khi chạy thật, mỗi lần
+so khớp chỉ xét vector của sinh viên trong lớp đang điểm danh, nên số vector
+phải so vẫn chỉ cỡ sĩ số một lớp dù toàn trường có bao nhiêu sinh viên.
+
+Mỗi khuôn mặt thêm vào khung hình tốn thêm khoảng \HnMoiMatThem{}\,ms: khung
+\HnSoMat{} khuôn mặt mất \HnNhieuMat{}\,ms. Màn quét camera của giảng viên chụp
+2 giây một lần và chỉ gửi khung mới khi khung trước đã xử lý xong, nên khung
+đông người làm giãn nhịp quét chứ không làm dồn yêu cầu. Theo cách tính này,
+một khung chụp trọn một lớp bốn mươi người sẽ mất nhiều giây; đây là ước
+lượng, chưa đo trên lớp thật.
+
+Phép đo cũng chỉ ra một chỗ tối ưu được ngay. Hệ thống đang nạp cả năm mô hình
+của bộ \code{buffalo\_l}, trong đó ba mô hình phụ không được dùng tới. Đo lại
+trên cùng ảnh với cấu hình chỉ nạp phát hiện và trích đặc trưng: khung một
+khuôn mặt còn \HnGonMotMat{}\,ms, giảm \HnGiamMotMat\%; khung \HnSoMat{} khuôn
+mặt còn \HnGonNhieuMat{}\,ms, giảm \HnGiamNhieuMat\%. Vector đặc trưng thu được
+giống hệt cấu hình đầy đủ. Thay đổi này chưa được áp dụng vào hệ thống.
+
+\section{Bàn luận và bài học rút ra}
+
+\textbf{Phần mô hình không phải phần khó nhất.} Việc ghép SCRFD và ArcFace
+vào hệ thống mất ít công hơn nhiều so với việc thiết kế đúng các quy tắc bao
+quanh nó: ai được xem ảnh bằng chứng, phiên đóng lúc nào, sửa điểm danh thì
+lưu vết ra sao, sinh viên rút lại dữ liệu sinh trắc thì xoá những gì. Đây là
+kết luận đáng chú ý nhất rút ra từ đồ án.
+
+\textbf{Thu hẹp không gian tìm kiếm là quyết định hiệu quả nhất.} Chỉ so khớp
+trong phạm vi lớp học phần vừa giảm chi phí tính toán, vừa cắt giảm mạnh xác
+suất nhận nhầm, vì hai người ngẫu nhiên giống nhau trong một lớp bốn mươi
+người hiếm hơn nhiều so với trong cơ sở dữ liệu toàn trường.
+
+\textbf{Sai số GPS trong nhà là rào cản thực tế.} Trong quá trình thử, việc
+đối chiếu vị trí phải nới nhiều lần mới dùng được: trừ sai số thiết bị báo lên
+trước khi so với bán kính, chỉ từ chối khi sai số vượt \FsaiSoGps{}\,m, và
+kể cả khi phòng học có toạ độ riêng thì bán kính cũng không nhỏ hơn
+\FbanKinhPhong\,m. Vì GPS không bao giờ đủ chính xác để phân biệt hai phòng
+cạnh nhau, những buổi cần chắc chắn được giao cho mã QR xoay vòng. Đây là ví dụ cho thấy một tính
+năng đúng về lý thuyết vẫn có thể không dùng được nếu bỏ qua đặc tính của
+thiết bị thật.
+
+\textbf{Phân quyền phải theo cách tổ chức làm việc thật.} Thiết kế ban đầu
+gộp mọi cán bộ Khoa vào một vai trò vừa nhập liệu vừa duyệt nghỉ có phép. Khi
+đối chiếu với cách Khoa vận hành, vai trò này được tách thành văn phòng Khoa
+và lãnh đạo Khoa. Nhờ phạm vi dữ liệu đã được cài đặt tập trung, việc tách
+chỉ cần thêm một vai trò vào nhóm vai trò cấp Khoa và chỉnh danh sách vai trò
+ở các endpoint sửa dữ liệu, không phải viết lại bộ lọc nào.
+
+\textbf{Kiểm thử tự động không thay được việc dùng thử thật.} Phiên bản đầu
+của mã QR vượt qua toàn bộ kiểm thử nhưng chỉ dùng được từ bên trong ứng dụng:
+ảnh QR chứa một chuỗi mã, phải vào đúng mục quét mã mới đọc được, còn camera
+thường của điện thoại không biết làm gì với chuỗi đó. Thiếu sót này không lộ
+ra ở kiểm thử mà ở lúc chạy thử theo thao tác của người dùng, và là lý do mã
+QR được đổi sang dạng đường link. Lớp chống giả mạo cũng gặp tình huống tương
+tự: kiểm thử dùng mô hình giả nên đều đạt, trong khi mô hình thật lại chấm ảnh
+người thật là giả mạo vì mã nguồn chia điểm ảnh cho 255, khác với cách mô hình
+được huấn luyện \cite{Minivision2020Silent}. Lỗi chỉ lộ ra khi chạy với tệp mô
+hình và ảnh thật.
+
+\textbf{Ràng buộc nên đặt ở tầng thấp nhất có thể.} Những quy tắc như mỗi lịch
+học chỉ có một phiên trong ngày được đặt thành ràng buộc của cơ sở dữ liệu, nên
+hai yêu cầu gửi đồng thời cũng không phá được. Nếu chỉ kiểm tra bằng lệnh điều
+kiện ở tầng ứng dụng thì lỗi kiểu này rất khó tái hiện và rất dễ lọt.
+
+\textbf{Viết kiểm thử ngay khi cài đặt là lựa chọn tiết kiệm.} Nhóm kiểm thử về
+các lỗi luồng nghiệp vụ đã phát hiện là bằng chứng rõ nhất: mỗi lỗi tìm ra đều
+được cố định lại bằng một ca kiểm thử, nhờ đó những lần sửa sau không làm hỏng
+lại thứ đã chạy đúng.
+
+\section{Hạn chế của hệ thống}
+
+\begin{enumerate}[leftmargin=1.8em, itemsep=3pt]
+  \item \textbf{Chưa đo độ chính xác và khả năng chống giả mạo trên dữ liệu
+        thật.} Hai phép đo này cần ảnh của nhiều người thật chụp ở nhiều điều
+        kiện, có sự đồng ý của người được chụp, và cần thử trực tiếp bằng ảnh
+        in, màn hình và video trước camera. Đồ án mới kiểm chứng phần này bằng
+        kiểm thử tự động và chạy mô hình trên ảnh mẫu, nên chưa có con số về tỉ
+        lệ nhận đúng hay tỉ lệ chặn giả mạo.
+  \item \textbf{Khung hình đông người chậm trên CPU.} Mỗi khuôn mặt thêm vào
+        tốn khoảng \HnMoiMatThem{}\,ms (Mục~\ref{sec:hieunang}), nên quét một
+        khung có cả lớp sẽ mất nhiều giây.
+  \item \textbf{Ngưỡng nhận diện cố định.} Hệ thống dùng một ngưỡng chung
+        $\tau = \FnguongNhanDien$ cho mọi người, trong khi ngưỡng tối ưu có
+        thể khác nhau tuỳ chất lượng ảnh đăng ký của từng sinh viên.
+  \item \textbf{Chống giả mạo chỉ dựa trên ảnh tĩnh.} Mô hình bị động không
+        chống được những kiểu tấn công tinh vi hơn như mặt nạ ba chiều \cite{Ramachandra2017Survey}.
+  \item \textbf{Bộ đếm xác nhận đa khung hình không bền vững.} Bộ đếm nằm
+        trong bộ nhớ tiến trình, nên khởi động lại máy chủ giữa giờ sẽ khiến
+        các phiên đang mở phải nhận diện lại từ đầu.
+  \item \textbf{Chưa chạy thử ở quy mô thật.} Hệ thống mới chạy trên máy phát
+        triển và dữ liệu mẫu, chưa qua thử nghiệm với nhiều lớp học đồng thời
+        trên hạ tầng của nhà trường.
+\end{enumerate}
+
+\section{Kết luận}
+
+Đồ án đã xây dựng hoàn chỉnh FAMS, một hệ thống quản lý sinh viên tích hợp
+điểm danh bằng nhận diện khuôn mặt, chạy được từ đầu tới cuối trên máy chủ
+không có GPU. Sản phẩm gồm một dịch vụ với \FsoEndpoint{} endpoint trên
+\FsoBang{} bảng dữ liệu, một ứng dụng Flutter \FsoManHinh{} màn hình dùng
+chung cho Web, Android và iOS, phân quyền cho \FsoVaiTro{} vai trò theo đúng
+cơ cấu tổ chức của trường, cùng \FsoTest{} ca kiểm thử tự động chạy trên
+PostgreSQL thật.
+
+Cả năm mục tiêu đặt ra ở Mục~\ref{sec:muctieu} đều đã đạt, với bằng chứng
+đối chiếu ở Bảng~\ref{tab:doichieumuctieu}. Phần chưa trọn vẹn nằm ở khâu
+kiểm định: hệ thống chưa được đo độ chính xác nhận diện và khả năng chống giả
+mạo trên dữ liệu thật, và chưa chạy thử ở quy mô thật của nhà trường.
+
+\section{Đóng góp của đồ án}
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Một quy trình điểm danh nhiều lớp phòng vệ.} Thay vì coi
+        nhận diện khuôn mặt là lời giải duy nhất, hệ thống xếp chồng sáu lớp
+        kiểm tra: chất lượng ảnh, chống giả mạo, xác nhận đa khung hình, thu
+        hẹp không gian so khớp, đối chiếu vị trí theo phòng học và mã QR xoay
+        vòng.
+  \item \textbf{Mô hình phân quyền hai chiều.} Quyền theo chức năng kết hợp
+        với phạm vi dữ liệu theo Khoa, cài đặt tập trung dưới dạng bộ lọc
+        truy vấn, cho phép thêm vai trò mới mà không phải sửa từng endpoint;
+        mọi thao tác quản lý đều được ghi vào nhật ký hệ thống.
+  \item \textbf{Thiết kế tôn trọng dữ liệu sinh trắc.} Đồng ý sinh trắc học
+        là bắt buộc, có phiên bản nội dung và được kiểm tra ở mọi điểm xử lý;
+        chỉ lưu vector đặc trưng chứ không lưu ảnh lâu dài, ảnh bằng chứng
+        phát qua đường dẫn được ký điện tử và tự hết hạn, người dùng rút đồng
+        ý là dữ liệu bị xoá ngay.
+  \item \textbf{Bộ tài liệu tự đồng bộ với mã nguồn.} Mọi con số về quy mô
+        trong báo cáo này được sinh tự động từ kho mã nguồn bằng công cụ mô
+        tả ở mục C của phần Phụ lục, nên báo cáo không thể mô tả sai hệ
+        thống mà không bị phát hiện.
+\end{itemize}
+
+\section{Hướng phát triển}
+
+\begin{enumerate}[leftmargin=1.8em, itemsep=3pt]
+  \item \textbf{Đo độ chính xác và khả năng chống giả mạo.} Thu thập ảnh có
+        sự đồng ý của nhiều sinh viên ở nhiều điều kiện ánh sáng và góc chụp,
+        tính tỉ lệ chấp nhận nhầm và từ chối nhầm \cite{Jain2004Biometric,
+        ISO19795}, chọn ngưỡng nhận diện theo đường cong ROC
+        \cite{Fawcett2006ROC} thay vì đặt theo kinh nghiệm; thử chống giả mạo
+        bằng ảnh in, màn hình và video, ghi cả số lần chặn nhầm người thật.
+  \item \textbf{Chỉ nạp mô hình cần dùng.} Giới hạn bộ \code{buffalo\_l} ở
+        phát hiện và trích đặc trưng; phép đo ở Mục~\ref{sec:hieunang} cho
+        thấy thời gian giảm \HnGiamMotMat\% với khung một khuôn mặt mà vector
+        không đổi.
+  \item \textbf{Ngưỡng thích nghi theo từng người.} Tính ngưỡng riêng dựa
+        trên độ phân tán của các vector đã đăng ký của mỗi sinh viên, thay
+        cho một ngưỡng chung.
+  \item \textbf{Chống giả mạo mạnh hơn.} Bổ sung tín hiệu chiều sâu nếu
+        thiết bị có cảm biến phù hợp, hoặc kết hợp thêm kiểm tra chủ động
+        trong luồng sinh viên tự điểm danh.
+  \item \textbf{Đưa bộ đếm xác nhận ra kho lưu trữ ngoài tiến trình.} Dùng
+        một kho khoá và giá trị như Redis để phiên đang mở không bị mất
+        trạng thái khi máy chủ khởi động lại, đồng thời chạy được nhiều tiến
+        trình máy chủ song song.
+  \item \textbf{Buộc đổi mật khẩu sau khi được đặt lại.} Hiện cán bộ đặt lại
+        xong vẫn biết mật khẩu của người đó. Nên yêu cầu người dùng đổi sang
+        mật khẩu riêng ngay ở lần đăng nhập kế tiếp.
+  \item \textbf{Kết nối với hệ thống quản lý đào tạo của trường.} Đồng bộ
+        danh sách lớp học phần và ghi danh thay vì nhập lại, đây là điều
+        kiện bắt buộc nếu muốn triển khai thật.
+  \item \textbf{Thông báo đẩy trên điện thoại.} Phụ huynh hiện nhận thông
+        báo trong hộp thư của ứng dụng và qua email. Bước tiếp theo là thông
+        báo đẩy qua dịch vụ của hệ điều hành, và gửi cảnh báo cho cả sinh viên
+        ngay khi tỉ lệ vắng chạm ngưỡng \FtiLeCanhBao\%.
+\end{enumerate}

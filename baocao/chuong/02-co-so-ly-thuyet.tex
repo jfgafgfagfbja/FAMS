@@ -1,0 +1,312 @@
+% ---------------------------------------------------------------------
+%  CHƯƠNG 2 — CƠ SỞ LÝ THUYẾT VÀ CÔNG NGHỆ
+% ---------------------------------------------------------------------
+\chapter{Cơ sở lý thuyết và công nghệ}
+\label{ch:coso}
+
+\begin{muctieu}
+Chương này trình bày nền tảng lý thuyết mà hệ thống dựa vào: cách một khuôn
+mặt được phát hiện và chuyển thành vector đặc trưng, cách so khớp danh tính
+bằng khoảng cách cosine, nguyên lý chống giả mạo khuôn mặt, kỹ thuật tìm
+kiếm trên không gian vector, cùng các công nghệ được chọn để hiện thực hoá.
+\end{muctieu}
+
+\section{Bài toán nhận diện khuôn mặt}
+
+Cần phân biệt ba bài toán thường bị gộp làm một \cite{Jain2004Biometric, Wang2021Survey}:
+
+\begin{dinhnghia}[Ba bài toán trên khuôn mặt]
+\textbf{Phát hiện khuôn mặt} \en{(face detection)} trả lời câu hỏi trong ảnh
+có khuôn mặt nào và nằm ở đâu. \textbf{Xác minh khuôn mặt} \en{(face
+verification)} trả lời hai khuôn mặt có phải cùng một người hay không.
+\textbf{Nhận diện khuôn mặt} \en{(face recognition hay identification)} trả
+lời khuôn mặt này là ai trong số những người đã biết.
+\end{dinhnghia}
+
+Điểm danh trong lớp là bài toán nhận diện trên tập đóng có giới hạn: hệ thống
+chỉ cần xác định khuôn mặt trong khung hình thuộc về sinh viên nào trong danh
+sách lớp, chứ không phải toàn bộ cơ sở dữ liệu của trường. Việc thu hẹp
+không gian tìm kiếm theo lớp học phần vừa làm tăng tốc độ, vừa giảm mạnh xác
+suất nhận nhầm, và được hệ thống khai thác triệt để ở Mục~\ref{sec:sokhop}.
+
+Quy trình nhận diện hiện đại gồm bốn bước nối tiếp nhau \cite{Wang2021Survey} như Hình~\ref{fig:pipeline}.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.15cm and 0.85cm, every node/.append style={align=center}]
+  \node (anh)   [io]      {Khung hình\\ từ camera};
+  \node (detect)[process, right=of anh]    {Phát hiện\\ SCRFD};
+  \node (align) [process, right=of detect] {Căn chỉnh\\ theo 5 điểm mốc};
+  \node (embed) [process, right=of align]  {Trích đặc trưng\\ ArcFace};
+  \node (match) [decision, below=of align] {So khớp cosine};
+  \node (out)   [startstop, right=of match, xshift=0.6cm] {Danh tính\\ và độ tin cậy};
+  \draw [flowarr] (anh)    -- (detect);
+  \draw [flowarr] (detect) -- (align);
+  \draw [flowarr] (align)  -- (embed);
+  \draw [flowarr] (embed)  |- (match);
+  \draw [flowarr] (match)  -- (out);
+\end{tikzpicture}
+\caption{Bốn bước của quy trình nhận diện khuôn mặt trong FAMS.}
+\label{fig:pipeline}
+\end{figure}
+
+\section{Phát hiện khuôn mặt bằng SCRFD}
+
+Bước đầu tiên là tìm vị trí mọi khuôn mặt trong khung hình. Các phương pháp
+cổ điển dựa trên đặc trưng Haar và bộ phân loại tầng \cite{Viola2001Rapid}
+chạy nhanh nhưng suy giảm rõ rệt khi khuôn mặt nghiêng hoặc thiếu sáng, tức
+đúng những điều kiện thường gặp trong giảng đường.
+
+Hệ thống dùng SCRFD \cite{Guo2021SCRFD}, một bộ dò khuôn mặt một giai đoạn
+được thiết kế để phân bổ chi phí tính toán hợp lý giữa các tầng đặc trưng,
+nhờ đó đạt độ chính xác cao trên khuôn mặt nhỏ mà vẫn nhẹ. Với ảnh chụp cả
+lớp, khuôn mặt của sinh viên ngồi cuối phòng chiếm rất ít điểm ảnh, nên khả
+năng phát hiện khuôn mặt nhỏ là tiêu chí quyết định lựa chọn này. Ngoài khung
+bao, SCRFD trả về năm điểm mốc gồm hai mắt, chóp mũi và hai khoé miệng, dùng
+cho bước căn chỉnh tiếp theo.
+
+Căn chỉnh \en{(alignment)} là phép biến đổi affine đưa năm điểm mốc về vị trí
+chuẩn, cho ra một ảnh khuôn mặt kích thước cố định \cite{Wang2021Survey}. Bước này quan trọng vì mô
+hình trích đặc trưng được huấn luyện trên các khuôn mặt đã căn chỉnh; bỏ qua
+nó thì cùng một người ở hai góc chụp khác nhau sẽ cho hai vector lệch nhau
+đáng kể.
+
+\section{Biểu diễn khuôn mặt bằng ArcFace}
+\label{sec:arcface}
+
+Thay vì phân loại trực tiếp ảnh khuôn mặt thành các lớp là từng người, hướng
+tiếp cận hiện đại học một \term{hàm nhúng} \en{(embedding)} ánh xạ ảnh khuôn
+mặt vào không gian vector, sao cho hai ảnh của cùng một người nằm gần nhau và
+hai người khác nhau nằm xa nhau. Ý tưởng này được phổ biến bởi FaceNet
+\cite{Schroff2015FaceNet} và được ArcFace \cite{Deng2019ArcFace} cải tiến.
+
+ArcFace bổ sung một biên góc cộng tính vào hàm mất mát softmax. Gọi
+$\theta_{y_i}$ là góc giữa vector đặc trưng của mẫu thứ $i$ và vector trọng
+số của lớp đúng $y_i$, $s$ là bán kính cầu và $m$ là biên góc, hàm mất mát
+có dạng \cite{Deng2019ArcFace}:
+
+\begin{equation}
+\label{eq:arcface}
+L = -\frac{1}{N}\sum_{i=1}^{N}
+\log \frac{e^{s\cos(\theta_{y_i}+m)}}
+{e^{s\cos(\theta_{y_i}+m)} + \sum_{j \neq y_i} e^{s\cos\theta_j}}
+\end{equation}
+
+Việc cộng thêm $m$ vào góc của lớp đúng buộc mô hình phải kéo mẫu lại gần
+tâm lớp của nó một khoảng chặt hơn mức tối thiểu cần để phân loại đúng. Hệ
+quả là các cụm đặc trưng của từng người tách bạch hơn trên mặt cầu đơn vị, và
+đó chính là tính chất mà bài toán nhận diện cần.
+
+Mô hình được dùng là bộ \code{buffalo\_l} của thư viện InsightFace
+\cite{InsightFace2023}, sinh ra vector \FchieuVector{} chiều đã chuẩn hoá về
+độ dài đơn vị.
+
+\begin{ghinho}
+Vector đặc trưng đã chuẩn hoá nên tích vô hướng của hai vector chính bằng
+cosine của góc giữa chúng. Nhờ vậy phép so khớp danh tính chỉ còn là một
+phép nhân vô hướng, rất rẻ về mặt tính toán.
+\end{ghinho}
+
+\subsection{So khớp bằng độ tương tự cosine}
+\label{sec:sokhop}
+
+Với hai vector đặc trưng $\mathbf{u}$ và $\mathbf{v}$, độ tương tự cosine và
+khoảng cách cosine được định nghĩa \cite{Manning2008IR}:
+
+\begin{equation}
+\label{eq:cosine}
+\mathrm{sim}(\mathbf{u}, \mathbf{v}) =
+\frac{\mathbf{u} \cdot \mathbf{v}}{\lVert \mathbf{u}\rVert \, \lVert \mathbf{v}\rVert},
+\qquad
+d(\mathbf{u}, \mathbf{v}) = 1 - \mathrm{sim}(\mathbf{u}, \mathbf{v})
+\end{equation}
+
+Giá trị $\mathrm{sim}$ nằm trong đoạn $[-1, 1]$, càng gần $1$ thì hai khuôn
+mặt càng giống nhau. Hệ thống coi là cùng một người khi độ tương tự vượt
+ngưỡng $\tau = \FnguongNhanDien$. Ngưỡng này điều tiết trực tiếp cán cân giữa
+hai loại lỗi \cite{Jain2004Biometric, ISO19795}:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=2pt]
+  \item \textbf{Chấp nhận sai} \en{(false accept)}: nhận nhầm sinh viên này
+        thành sinh viên khác, dẫn tới điểm danh cho người vắng mặt. Đây là
+        lỗi nguy hiểm vì phá hỏng ý nghĩa của cả hệ thống.
+  \item \textbf{Từ chối sai} \en{(false reject)}: không nhận ra sinh viên
+        đang có mặt. Lỗi này gây phiền nhưng còn khắc phục được, vì giảng
+        viên có thể xác nhận tay.
+\end{itemize}
+
+Vì hai loại lỗi có hậu quả không cân xứng, hệ thống ưu tiên hạ thấp tỉ lệ
+chấp nhận sai, chấp nhận đánh đổi bằng một mức từ chối sai cao hơn.
+
+\subsection{Vì sao không tự huấn luyện mô hình}
+\label{sec:vosaokhonghuanluyen}
+
+Một câu hỏi hợp lý là tại sao đồ án không huấn luyện một mạng phân loại trên
+chính ảnh sinh viên của trường, mà dùng lại mô hình đã huấn luyện sẵn theo
+hướng học chuyển giao \en{(transfer learning)} \cite{Pan2010Transfer}. Có ba lý do:
+
+\begin{enumerate}[leftmargin=1.8em, itemsep=2pt]
+  \item \textbf{Tập người dùng luôn thay đổi.} Mỗi kỳ có sinh viên mới nhập
+        học và sinh viên tốt nghiệp. Mô hình phân loại buộc phải huấn luyện
+        lại mỗi lần danh sách đổi, còn hàm nhúng chỉ cần thêm một vector.
+  \item \textbf{Dữ liệu cho mỗi người quá ít.} Mỗi sinh viên chỉ đăng ký
+        vài ảnh, không đủ để huấn luyện một lớp phân loại ổn định, trong khi
+        ArcFace được huấn luyện trên hàng triệu ảnh của hàng chục nghìn danh
+        tính \cite{Deng2019ArcFace} nên đã học được đặc trưng tổng quát.
+  \item \textbf{Chi phí và rủi ro.} Huấn luyện lại đòi hỏi GPU và một tập
+        dữ liệu khuôn mặt sinh viên đủ lớn, tức phải thu thập thêm dữ liệu
+        sinh trắc, đi ngược nguyên tắc thu thập tối thiểu \cite{GDPR2016} đã nêu ở
+        Chương~\ref{ch:modau}.
+\end{enumerate}
+
+\section{Chống giả mạo khuôn mặt}
+\label{sec:chonggiamao}
+
+Một hệ thống chỉ so khớp đặc trưng sẽ chấp nhận cả ảnh in lẫn ảnh hiển thị
+trên màn hình điện thoại, vì những ảnh đó cho vector đặc trưng gần như giống
+hệt người thật. Đây là kiểu tấn công trình chiếu \en{(presentation attack)} \cite{ISO30107, Ramachandra2017Survey},
+và là lỗ hổng rõ ràng nhất của điểm danh bằng khuôn mặt.
+
+Phát hiện sự sống \en{(liveness detection)} chia làm hai nhóm \cite{Ramachandra2017Survey}. Nhóm chủ động
+yêu cầu người dùng thực hiện hành vi như chớp mắt hay quay đầu; nhóm bị động
+chỉ phân tích chính khung hình tĩnh. Hệ thống chọn hướng bị động với mô hình
+MiniFASNetV2 thuộc bộ Silent-Face-Anti-Spoofing \cite{Minivision2020Silent},
+vì hướng chủ động không dùng được khi giảng viên quét cả lớp bằng một khung
+hình.
+
+MiniFASNetV2 khai thác những dấu vết mà một bề mặt phẳng để lại \cite{Ramachandra2017Survey}: phản xạ ánh
+sáng khác da thật, hiện tượng răng cưa của lưới điểm ảnh khi chụp lại màn
+hình, viền giấy hoặc viền thiết bị, và sự thiếu vắng kết cấu vi mô của da.
+Mô hình nhận ảnh khuôn mặt đã mở rộng khung bao theo hệ số $2{,}7$ để lấy
+thêm bối cảnh xung quanh, đưa về kích thước $80 \times 80$ điểm ảnh, rồi cho
+ra điểm tin cậy cho ba lớp, trong đó lớp \term{mặt thật} phải vượt ngưỡng
+$\FnguongThat$ thì khung hình mới được chấp nhận.
+
+\begin{luuy}
+Không có mô hình chống giả mạo nào đạt độ chính xác tuyệt đối. Vì vậy hệ
+thống không coi đây là lớp phòng vệ duy nhất, mà kết hợp thêm xác nhận đa
+khung hình, đối chiếu vị trí và quyền xác nhận cuối cùng của giảng viên, như
+trình bày ở Mục~\ref{sec:baolop}.
+\end{luuy}
+
+\section{Tìm kiếm trên không gian vector}
+
+Khi số vector đã đăng ký tăng lên, việc so sánh tuần tự với từng vector trở
+nên tốn kém. Bài toán này gọi là tìm láng giềng gần nhất \en{(nearest
+neighbour search)}. Với dữ liệu nhiều chiều, các cấu trúc chỉ mục cổ điển
+không còn hiệu quả, nên thực tế dùng tìm kiếm gần đúng \cite{Indyk1998ANN}, đổi một phần rất nhỏ
+độ chính xác lấy tốc độ cao hơn nhiều lần.
+
+Hệ thống dùng chỉ mục HNSW \cite{Malkov2020HNSW}, một đồ thị thế giới nhỏ
+phân tầng: tầng trên thưa để nhảy nhanh tới vùng cần tìm, tầng dưới dày để
+tinh chỉnh kết quả. Điểm thuận lợi về mặt kỹ thuật là chỉ mục này có sẵn
+trong pgvector \cite{Pgvector2024}, một phần mở rộng của PostgreSQL cho phép
+lưu vector ngay trong bảng dữ liệu và viết truy vấn so khớp bằng SQL thông
+thường. Nhờ đó hệ thống không cần thêm một cơ sở dữ liệu vector riêng, và
+điều kiện lọc theo lớp học phần hay theo trạng thái duyệt được đẩy xuống cho
+cơ sở dữ liệu xử lý cùng lúc với phép so khớp.
+
+\section{Công nghệ sử dụng}
+
+\begin{table}[H]
+\centering
+\caption{Các công nghệ chính và lý do lựa chọn.}
+\label{tab:congnghe}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}l >{\raggedright\arraybackslash}p{3.1cm} X@{}}
+\toprule
+Thành phần & Công nghệ & Lý do chọn \\
+\midrule
+Dịch vụ & FastAPI, SQLAlchemy 2.0 & Kiểu dữ liệu tường minh, tự sinh tài liệu
+  API, hệ sinh thái Python sẵn có thư viện thị giác máy tính \\
+Cơ sở dữ liệu & PostgreSQL 16, pgvector \cite{Pgvector2024} & Lưu dữ liệu quan hệ và vector đặc
+  trưng trong cùng một nơi, hỗ trợ chỉ mục HNSW \\
+Suy luận mô hình & ONNX Runtime (CPU) & Chạy được trên máy chủ không GPU,
+  không phụ thuộc khung học sâu lúc triển khai \\
+Ứng dụng & Flutter & Một mã nguồn cho Web, Android và iOS, truy cập được
+  camera và định vị \\
+Triển khai & Docker Compose, nginx & Dựng lại toàn bộ hệ thống bằng một
+  lệnh, tách biệt môi trường \\
+Kiểm thử & pytest trên PostgreSQL thật & Kiểu dữ liệu vector không mô phỏng
+  được bằng cơ sở dữ liệu nhúng \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{5.6cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:congnghe}: mỗi công nghệ nằm ở đâu trong mã nguồn.}
+\label{tab:congnghe-gt}\\
+\toprule
+Lớp & Nằm ở & Ghi chú \\
+\midrule
+\endfirsthead
+\toprule
+Lớp & Nằm ở & Ghi chú \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Dịch vụ & \code{backend/app/api}, \code{backend/app/services}, \code{backend/app/schemas.py} & FastAPI tự kiểm tra dữ liệu vào theo kiểu đã khai báo và trả lỗi 422 khi sai, nên từng endpoint không phải tự kiểm tra từng trường \\
+Cơ sở dữ liệu & \code{models.py} trong \code{backend/app/db}; các tệp di trú trong \code{backend/alembic} & Lược đồ chỉ đổi qua di trú Alembic; cột vector có chỉ mục HNSW \\
+Suy luận mô hình & \code{face\_service.py}, \code{antispoof\_service.py} trong \code{backend/app/services} & Mô hình nạp ở lần dùng đầu tiên rồi giữ trong bộ nhớ cho các yêu cầu sau \\
+Ứng dụng & \code{mobile/lib} & Cùng một mã nguồn build ra bản Web, Android và iOS \\
+Triển khai & \code{docker-compose.yml}, \code{deploy/} & Một lệnh dựng cơ sở dữ liệu, máy chủ và giao diện \\
+Kiểm thử & \code{backend/tests}, \code{mobile/test} & Phía máy chủ chạy trên PostgreSQL thật; phía ứng dụng dùng \code{flutter test} \\
+\end{xltabular}}
+
+\section{Các hệ thống liên quan}
+
+Điểm danh tự động đã có nhiều lời giải thương mại và học thuật. Bảng
+\ref{tab:sosanh} đối chiếu FAMS với ba nhóm giải pháp phổ biến.
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash}p{3.0cm} X X X@{}}
+\caption{So sánh FAMS với các giải pháp điểm danh khác.}
+\label{tab:sosanh}\\
+\toprule
+Tiêu chí & Điểm danh thủ công & Thẻ từ hoặc mã QR & FAMS \\
+\midrule
+\endfirsthead
+\toprule
+Tiêu chí & Điểm danh thủ công & Thẻ từ hoặc mã QR & FAMS \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Thời gian mỗi tiết & 5--10 phút & 1--2 phút & Dưới 1 phút, quét cả lớp \\
+Chống điểm danh hộ & Không & Không, vì thẻ và mã chuyển tay được & Có, dựa
+  trên đặc điểm sinh trắc \\
+Bằng chứng kiểm chứng & Chữ ký giấy & Nhật ký quẹt thẻ & Ảnh bằng chứng kèm
+  nhật ký sửa đổi \\
+Chi phí thiết bị & Không & Đầu đọc cho mỗi phòng & Máy tính hoặc điện thoại
+  sẵn có \\
+Rủi ro về dữ liệu & Thấp & Trung bình & Cao, vì là dữ liệu sinh trắc, nên
+  cần cơ chế đồng ý và phân quyền \\
+\end{xltabular}}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{4.6cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:sosanh}: ý nghĩa từng tiêu chí và căn cứ cho cột FAMS.}
+\label{tab:sosanh-gt}\\
+\toprule
+Tiêu chí & Nghĩa là gì & Căn cứ cho cột FAMS \\
+\midrule
+\endfirsthead
+\toprule
+Tiêu chí & Nghĩa là gì & Căn cứ cho cột FAMS \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Thời gian mỗi tiết & Thời gian giảng viên dành cho việc điểm danh trong một tiết & Ước lượng từ thời gian xử lý mỗi khung hình ở Bảng~\ref{tab:hieunang}; chưa đo trên một lớp học thật \\
+Chống điểm danh hộ & Có ngăn được một người điểm danh thay người khác hay không & Khuôn mặt không chuyển tay được; các lớp kiểm tra ở Bảng~\ref{tab:phongve} \\
+Bằng chứng kiểm chứng & Căn cứ để xem lại khi có khiếu nại & Ảnh bằng chứng lưu \FngayLuuAnh{} ngày và nhật ký sửa điểm danh có lý do bắt buộc \\
+Chi phí thiết bị & Thiết bị phải mua thêm cho mỗi phòng & Dùng webcam hoặc điện thoại sẵn có; máy chủ chỉ cần CPU \\
+Rủi ro về dữ liệu & Mức nhạy cảm của dữ liệu thu thập & Dữ liệu sinh trắc, nên đồng ý là bắt buộc (Mục~\ref{sec:dongy}) và mọi truy cập đi qua phân quyền \\
+\end{xltabular}}
+
+Nhận xét rút ra là ưu thế của hướng nhận diện khuôn mặt chỉ giữ được nếu hệ
+thống xử lý đúng ba việc: chống giả mạo, phân quyền truy cập ảnh, và cho
+người dùng quyền kiểm soát dữ liệu sinh trắc của mình. Ba việc này định hình
+phần lớn thiết kế được trình bày ở Chương~\ref{ch:thietke}.

@@ -1,0 +1,464 @@
+% !TEX program = xelatex
+% =====================================================================
+%  SLIDE BẢO VỆ ĐỒ ÁN TRÍ TUỆ NHÂN TẠO, HỌC PHẦN AIP202
+%  Đề tài: FAMS — Điểm danh bằng nhận diện khuôn mặt
+%
+%  Build:  latexmk -xelatex slide.tex
+%  Overleaf: Menu > Compiler > XeLaTeX, Main document > slide.tex
+%
+%  Slide dùng chung số liệu với quyển báo cáo: cùng nạp auto/du-lieu-du-an.tex
+%  do tools/quet-du-an.py sinh ra, nên hai tài liệu không bao giờ lệch nhau.
+% =====================================================================
+\documentclass[aspectratio=169, 11pt]{beamer}
+\usepackage{styles/slide-dau}
+
+% Số liệu quét từ kho mã nguồn. Sinh lại: python tools/quet-du-an.py
+\input{auto/du-lieu-du-an}
+
+% >>> SINH VIÊN ĐIỀN: họ tên, MSSV, lớp
+\sdSinhVien{Nguyễn Đăng Sen}
+\sdMSSV{2351220206}
+\sdLop{CNTT 23A}                % <<< KIỂM TRA LẠI: đang đoán theo khoá 23
+\sdGVHD{TS. Đỗ Phúc Hảo}
+\sdMonHoc{Học phần AIP202 \textperiodcentered{} 2 tín chỉ}
+\sdNoiNgay{Đà Nẵng, tháng \dots{} năm 2026}
+
+\title{FAMS — Điểm danh bằng nhận diện khuôn mặt}
+\author{\sdTenSinhVien}
+\date{\sdDiaDiemNgay}
+
+\begin{document}
+
+\slidebia{HỆ THỐNG QUẢN LÝ SINH VIÊN TÍCH HỢP\\ĐIỂM DANH BẰNG NHẬN DIỆN KHUÔN MẶT}
+
+% ---------------------------------------------------------------------
+\begin{frame}{Nội dung trình bày}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{enumerate}
+        \item Bài toán và mục tiêu
+        \item Cơ sở lý thuyết
+        \item Thiết kế hệ thống
+      \end{enumerate}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \begin{enumerate}
+        \setcounter{enumi}{3}
+        \item Chống gian lận và bảo vệ dữ liệu
+        \item Kết quả và demo
+        \item Hạn chế, hướng phát triển
+      \end{enumerate}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{center}
+    \solon{\FsoEndpoint}{endpoint} \hfill
+    \solon{\FsoBang}{bảng dữ liệu} \hfill
+    \solon{\FsoTest}{ca kiểm thử}
+  \end{center}
+\end{frame}
+
+% =====================================================================
+\section{Bài toán và mục tiêu}
+
+\begin{frame}{Điểm danh thủ công: ba vấn đề}
+  \begin{columns}[T]
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Tốn thời gian}
+        5--10 phút mỗi tiết để gọi tên hoặc chuyền tờ ký.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Không xác thực}
+        Ký thay, dạ thay. Không để lại bằng chứng kiểm chứng được.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Tổng hợp quá muộn}
+        Cuối kỳ mới biết ai vắng quá tỉ lệ, khi đã mất quyền thi.
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{center}
+    \small\color{gray700}
+    Khuôn mặt luôn mang theo người, không cần phát thẻ, một khung hình
+    nhận được nhiều người cùng lúc.
+  \end{center}
+\end{frame}
+
+\begin{frame}{Năm mục tiêu của đồ án}
+  \begin{enumerate}
+    \item Quy trình nhận diện hoàn chỉnh, chạy được trên máy chủ \textbf{không GPU}.
+    \item Chống ba kiểu gian lận: ảnh in, nhận nhầm, điểm danh từ xa.
+    \item Số hoá trọn vẹn nghiệp vụ chuyên cần, có lưu vết mọi lần sửa.
+    \item Phân quyền đúng cơ cấu tổ chức của trường, \FsoVaiTro{} vai trò.
+    \item Một mã nguồn cho Web, Android, iOS, kèm bộ kiểm thử tự động.
+  \end{enumerate}
+  \vfill
+  {\small\color{gray500}Toàn bộ mục tiêu được đối chiếu lại ở phần Kết quả.}
+\end{frame}
+
+% =====================================================================
+\section{Cơ sở lý thuyết}
+
+\begin{frame}{Bốn bước của quy trình nhận diện}
+  \begin{center}
+  \begin{tikzpicture}[scale=0.8, transform shape, node distance=0.7cm and 0.7cm, every node/.append style={align=center}]
+    \node (anh)   [objbox] {Khung hình};
+    \node (detect)[process, right=of anh]    {Phát hiện\\ SCRFD};
+    \node (align) [process, right=of detect] {Căn chỉnh\\ 5 điểm mốc};
+    \node (embed) [process, right=of align]  {ArcFace\\ \FchieuVector{} chiều};
+    \node (match) [decision, right=of embed] {Cosine\\ $\geq \FnguongNhanDien$?};
+    \node (out)   [startstop, right=of match] {Danh tính};
+    \draw [flowarr] (anh) -- (detect);
+    \draw [flowarr] (detect) -- (align);
+    \draw [flowarr] (align) -- (embed);
+    \draw [flowarr] (embed) -- (match);
+    \draw [flowarr] (match) -- (out);
+  \end{tikzpicture}
+  \end{center}
+  \vfill
+  \begin{itemize}
+    \item Không phân loại trực tiếp, mà học \textbf{hàm nhúng}: cùng người thì gần nhau.
+    \item Thêm một sinh viên mới chỉ cần \textbf{một ảnh}, không huấn luyện lại.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{ArcFace và ngưỡng nhận diện}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Biên góc cộng tính kéo các mẫu của cùng một người lại gần tâm lớp
+      chặt hơn mức tối thiểu cần để phân loại đúng:
+      \vspace{0.3em}
+      \[
+        L = -\frac{1}{N}\sum_{i}
+        \log \frac{e^{s\cos(\theta_{y_i}+m)}}
+        {e^{s\cos(\theta_{y_i}+m)} + \sum_{j \neq y_i} e^{s\cos\theta_j}}
+      \]
+      \vspace{0.1em}
+      Vector đã chuẩn hoá nên so khớp chỉ còn một phép nhân vô hướng.
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \begin{block}{Hai loại lỗi không cân xứng}
+        \textbf{Chấp nhận sai}: điểm danh cho người vắng mặt, phá hỏng cả hệ thống.
+
+        \vspace{4pt}
+        \textbf{Từ chối sai}: chỉ gây phiền, giảng viên xác nhận tay được.
+      \end{block}
+      \vspace{0.2em}
+      {\small Ngưỡng $\tau = \FnguongNhanDien$ được chọn nghiêng về phía
+      giảm chấp nhận sai.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% =====================================================================
+\section{Thiết kế hệ thống}
+
+\begin{frame}{Kiến trúc ba lớp}
+  \begin{center}
+  \begin{tikzpicture}[scale=0.95, transform shape, node distance=0.55cm and 0.9cm, every node/.append style={align=center}]
+    \node (web)  [objbox] {Flutter Web\\ cán bộ, giảng viên};
+    \node (mobi) [objbox, below=of web] {Flutter Android, iOS\\ sinh viên, phụ huynh};
+    \node (api)  [clsbox, right=of web, yshift=-0.8cm, minimum height=1.5cm]
+          {FastAPI\\ \FsoEndpoint{} endpoint\\ xác thực, phân quyền};
+    \node (svc)  [clsbox, right=of api, minimum height=1.5cm]
+          {Lớp dịch vụ\\ nhận diện, chống giả mạo,\\ phiên, vị trí, thống kê};
+    \node (db)   [membox, right=of svc, yshift=0.45cm] {PostgreSQL 16\\ pgvector, HNSW};
+    \node (onnx) [membox, right=of svc, yshift=-0.55cm] {ONNX Runtime\\ SCRFD, ArcFace,\\ MiniFASNetV2};
+    \draw [flowarr] (web) -- (api);
+    \draw [flowarr] (mobi) -- (api);
+    \draw [flowarr] (api) -- (svc);
+    \draw [flowarr] (svc) -- (db);
+    \draw [flowarr] (svc) -- (onnx);
+  \end{tikzpicture}
+  \end{center}
+  \vfill
+  {\small Mọi suy luận mô hình nằm ở máy chủ. Ba vòng lặp nền dọn ảnh quá
+  hạn, tự đóng phiên bị quên và gửi email thông báo cho phụ huynh.}
+\end{frame}
+
+\begin{frame}{Phân quyền hai chiều}
+  \begin{center}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lcccccc@{}}
+    \toprule
+    Chức năng & Quản trị & P.\,ĐT & P.\,CTSV & LĐ Khoa & VP Khoa & Ban ngành \\
+    \midrule
+    Lớp học phần, lịch, ghi danh & Sửa   & Sửa & Xem   & Xem*   & Sửa* & -- \\
+    Hồ sơ sinh viên, phụ huynh   & Sửa   & Xem & Sửa   & Xem*   & Xem* & -- \\
+    Đồng ý bản giấy, duyệt mặt   & Sửa   & --  & Sửa   & --     & --   & -- \\
+    Đặt lại mật khẩu SV, phụ huynh & Sửa & --  & Sửa   & --     & --   & -- \\
+    Duyệt nghỉ có phép           & Duyệt & --  & Duyệt & Duyệt* & --   & -- \\
+    Thống kê tổng hợp            & Xem   & Xem & Xem   & Xem*   & Xem* & Xem \\
+    Nhật ký hệ thống             & Xem   & --  & --    & Xem*   & --   & -- \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vfill
+  \begin{itemize}
+    \item \textbf{Quyền chức năng} kết hợp \textbf{phạm vi dữ liệu}: dấu sao
+          nghĩa là chỉ trong Khoa của mình.
+    \item Cài đặt tập trung thành bộ lọc truy vấn, mặc định là \textbf{từ chối}.
+  \end{itemize}
+\end{frame}
+
+% =====================================================================
+\section{Chống gian lận và bảo vệ dữ liệu}
+
+\begin{frame}{Sáu lớp phòng vệ xếp chồng}
+  \begin{center}
+  \small
+  \begin{tabularx}{0.95\textwidth}{@{}>{\bfseries\raggedright\arraybackslash}p{4.6cm} X@{}}
+    \toprule
+    Lớp phòng vệ & Ngăn kiểu gian lận \\
+    \midrule
+    Kiểm tra chất lượng ảnh & Ảnh mờ, tối, khuôn mặt quá nhỏ \\
+    Chống giả mạo MiniFASNetV2 & Ảnh in, ảnh trên màn hình điện thoại \\
+    Xác nhận \FsoKhungXacNhan{} khung hình & Một khung hình may mắn vượt ngưỡng \\
+    So khớp theo phạm vi lớp & Nhận nhầm người ngoài lớp, chụp hộ bạn \\
+    Đối chiếu GPS theo phòng học & Điểm danh từ nhà \\
+    Mã QR đổi mỗi \FgiayDoiQr{} giây & Chụp mã gửi cho bạn ở xa \\
+    \bottomrule
+  \end{tabularx}
+  \end{center}
+  \vfill
+  {\small\color{gray700} Không lớp nào là tuyệt đối. Một hành vi gian lận
+  phải vượt qua \textbf{toàn bộ} mới thành công.}
+\end{frame}
+
+\begin{frame}{Dữ liệu khuôn mặt là dữ liệu sinh trắc}
+  \begin{columns}[T]
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Đồng ý là bắt buộc}
+        Nội dung có phiên bản; tự xác nhận hoặc ký bản giấy. Chưa đồng ý thì
+        không nhận diện.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Giữ tối thiểu}
+        Chỉ lưu vector. Ảnh duyệt xoá ngay, ảnh bằng chứng xoá sau
+        \FngayLuuAnh{} ngày.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Người dùng kiểm soát}
+        Rút đồng ý là xoá ngay toàn bộ ảnh và vector khuôn mặt.
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{itemize}
+    \item Ảnh phát qua \textbf{đường dẫn được ký điện tử} (HMAC), hết hạn sau
+          \FphutHetHanUrl{} phút, không có thư mục ảnh công khai.
+    \item Không endpoint nào trả vector đặc trưng ra ngoài.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Nhật ký hệ thống: ai làm gì, lúc nào}
+  \begin{columns}[T]
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Ghi gì}
+        Đăng nhập, cả lần sai. Mọi thao tác thêm, sửa, xoá. Xuất báo cáo.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Ghi thế nào}
+        Tự động ở tầng ánh xạ đối tượng, trong cùng giao dịch: không
+        endpoint nào quên ghi.
+      \end{block}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \begin{block}{Ai xem}
+        Quản trị viên toàn trường; lãnh đạo Khoa phần của Khoa mình.
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  \begin{itemize}
+    \item Mỗi dòng lưu giá trị cũ và mới của từng trường đã đổi.
+    \item Mật khẩu, vector khuôn mặt, mã OTP chỉ ghi là \emph{đã thay đổi}.
+  \end{itemize}
+\end{frame}
+
+% =====================================================================
+\section{Kết quả}
+
+\begin{frame}{Sản phẩm thu được}
+  \begin{center}
+    \solon{\FsoEndpoint}{endpoint} \hfill
+    \solon{\FsoBang}{bảng dữ liệu} \hfill
+    \solon{\FsoManHinh}{màn hình ứng dụng}
+
+    \vspace{0.7cm}
+
+    \solon{\FsoVaiTro}{vai trò người dùng} \hfill
+    \solon{\FsoTest}{ca kiểm thử} \hfill
+    \solon{\FsoCommit}{commit}
+  \end{center}
+  \vfill
+  {\small\color{gray500} Mọi con số trên được quét tự động từ kho mã nguồn,
+  bản commit \code{\FcommitCuoi} ngày \FngayCommit.}
+
+  \vspace{4pt}
+  {\small\bfseries Mã nguồn:
+  \href{https://github.com/jfgafgfagfbja/FAMS}{\color{daumaroon}github.com/jfgafgfagfbja/FAMS}}
+\end{frame}
+
+\begin{frame}{Sinh viên tự điểm danh: mã QR, vị trí, khuôn mặt}
+  \begin{columns}[c]
+    \begin{column}{0.34\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{kq-ma-qr.png}
+    \end{column}
+    \begin{column}{0.64\textwidth}
+      \centering
+      \includegraphics[width=0.325\linewidth]{kq-tu-dd-1.png}\hfill
+      \includegraphics[width=0.325\linewidth]{kq-tu-dd-2.png}\hfill
+      \includegraphics[width=0.325\linewidth]{kq-tu-dd-3.png}
+    \end{column}
+  \end{columns}
+  \vfill
+  {\small\color{gray500} Chạy thật trên iPhone: quét mã, đối chiếu vị trí, rồi so khớp chỉ với khuôn mặt của chính sinh viên.}
+\end{frame}
+
+\begin{frame}{Sinh viên và phụ huynh trên điện thoại}
+  \begin{center}
+    \includegraphics[height=0.72\textheight]{kq-sv-trang-chu.png}\hfill
+    \includegraphics[height=0.72\textheight]{kq-sv-chuyen-can.png}\hfill
+    \includegraphics[height=0.72\textheight]{kq-sv-khuon-mat.png}\hfill
+    \includegraphics[height=0.72\textheight]{kq-ph-thong-bao.png}
+  \end{center}
+  \vfill
+  {\small\color{gray500} Trang chủ, chuyên cần, dữ liệu khuôn mặt của sinh viên; thông báo của phụ huynh.}
+\end{frame}
+
+\begin{frame}{Phòng ban: tổng quan chuyên cần}
+  \begin{columns}[c]
+    \begin{column}{0.49\textwidth}
+      \includegraphics[width=\linewidth]{kq-tong-quan.png}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \includegraphics[width=\linewidth]{kq-bieu-do.png}
+    \end{column}
+  \end{columns}
+  \vfill
+  {\small\color{gray500} Thông tin cán bộ, lối tắt theo vai trò và biểu đồ theo Khoa. Số liệu từ dữ liệu mẫu.}
+\end{frame}
+
+\begin{frame}{Kiểm thử tự động}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item \FsoTest{} ca trong \FsoFileTest{} tệp, khoảng \FsoDongTest{}
+              dòng mã kiểm thử.
+        \item Chạy trên \textbf{PostgreSQL thật}: kiểu vector không mô phỏng
+              được bằng cơ sở dữ liệu nhúng.
+        \item Mỗi ca chạy trong một giao dịch rồi quay lui.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{block}{Nhóm kiểm thử trọng tâm}
+        \small
+        Phân quyền theo vai trò và theo Khoa \\
+        Vòng đời phiên điểm danh \\
+        Duyệt khuôn mặt và quyền riêng tư \\
+        Tự điểm danh kèm đối chiếu GPS \\
+        Token, thu hồi và đường dẫn ảnh ký điện tử \\
+        Đồng ý sinh trắc và nhật ký hệ thống
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  {\small\color{gray700} Lần chạy ngày 12/11/2026: \code{278 passed in
+  39.56s}.}
+\end{frame}
+
+\begin{frame}{Demo}
+  \begin{center}
+    \vspace{0.6cm}
+    {\Large\bfseries\color{daumaroon} Phần trình diễn trực tiếp}\\[0.7cm]
+    \begin{tabular}{@{}r@{\hspace{0.5cm}}l@{}}
+      \bfseries 1 & Sinh viên đăng ký khuôn mặt, cán bộ duyệt \\[3pt]
+      \bfseries 2 & Giảng viên mở phiên và quét camera cả lớp \\[3pt]
+      \bfseries 3 & Thử gian lận bằng ảnh in, hệ thống chặn \\[3pt]
+      \bfseries 4 & Sinh viên tự điểm danh, đối chiếu vị trí \\[3pt]
+      \bfseries 5 & Cảnh báo vắng và xuất báo cáo Excel \\
+    \end{tabular}
+    \vspace{0.5cm}
+
+    {\small\color{gray500} Tài khoản mẫu cho từng vai trò có trong phụ lục
+    của quyển báo cáo.}
+  \end{center}
+\end{frame}
+
+% ---------------------------------------------------------------------
+% ẢNH DEMO: chụp màn hình hệ thống, đặt vào figs/ rồi bỏ ký tự % ở đầu.
+% ---------------------------------------------------------------------
+% \begin{frame}{Màn hình quét camera của giảng viên}
+%   \begin{center}
+%     \includegraphics[height=0.72\textheight]{man-quet-camera.png}
+%   \end{center}
+% \end{frame}
+
+% =====================================================================
+\section{Hạn chế và hướng phát triển}
+
+\begin{frame}{Điều quan trọng nhất học được}
+  \vfill
+  \begin{center}
+    {\Large\bfseries\color{daumaroon}
+     Phần khó của một hệ thống trí tuệ nhân tạo\\ nằm ở \emph{ngoài} mô hình.}
+  \end{center}
+  \vfill
+  \begin{itemize}
+    \item Ghép SCRFD và ArcFace vào hệ thống là phần tốn ít công nhất.
+    \item Phần tốn công là những câu hỏi mô hình không trả lời được: phiên
+          đóng lúc nào, ai được sửa điểm danh, sửa thì lưu vết ra sao, sinh
+          viên rút lại dữ liệu thì xoá những gì.
+    \item Ràng buộc nên đặt ở tầng thấp nhất có thể, tức ở cơ sở dữ liệu.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Hạn chế và hướng phát triển}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{\color{daumaroon} Hạn chế}
+      \begin{itemize}
+        \item Chưa kiểm định trên tập dữ liệu lớn.
+        \item Ngưỡng nhận diện cố định cho mọi người.
+        \item Chống giả mạo chỉ dựa trên ảnh tĩnh.
+        \item Bộ đếm xác nhận mất khi khởi động lại máy chủ.
+        \item Chưa chạy thử ở quy mô thật.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{\color{agentragreen} Hướng phát triển}
+      \begin{itemize}
+        \item Đánh giá trên tập lớn, chọn ngưỡng theo đường cong ROC.
+        \item Ngưỡng thích nghi theo từng sinh viên.
+        \item Bổ sung tín hiệu chiều sâu khi thiết bị hỗ trợ.
+        \item Đưa bộ đếm ra kho lưu trữ ngoài tiến trình.
+        \item Kết nối hệ thống quản lý đào tạo, thông báo đẩy.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[plain]
+  \vfill
+  \begin{center}
+    {\fontsize{26}{30}\selectfont\bfseries\color{daumaroon} Cảm ơn thầy cô đã lắng nghe}\\[6pt]
+    {\color{daugold}\rule{6cm}{1.6pt}}\\[0.8cm]
+    {\large\color{daunavy} Em xin nhận câu hỏi của hội đồng}\\[1.0cm]
+    {\small\color{gray500}
+     \sdTenSinhVien{} \textperiodcentered{} \sdMaSinhVien{} \textperiodcentered{}
+     \sdTenLop \\[3pt]
+     Giảng viên hướng dẫn: \sdTenGVHD}
+  \end{center}
+  \vfill
+\end{frame}
+
+\end{document}

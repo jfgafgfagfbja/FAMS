@@ -1,0 +1,124 @@
+% ---------------------------------------------------------------------
+%  CHƯƠNG 1 — MỞ ĐẦU
+% ---------------------------------------------------------------------
+\chapter{Mở đầu}
+\label{ch:modau}
+
+\begin{muctieu}
+Chương này nêu bối cảnh của bài toán điểm danh ở giảng đường, lý do chọn
+hướng giải quyết bằng nhận diện khuôn mặt, các mục tiêu cụ thể mà đồ án cam
+kết đạt được, phạm vi thực hiện và bố cục của báo cáo.
+\end{muctieu}
+
+\section{Lý do chọn đề tài}
+
+Một tiết học ở giảng đường thường bắt đầu bằng việc gọi tên hoặc chuyền tay
+tờ danh sách ký. Với lớp học phần vài chục sinh viên, việc này lấy mất
+khoảng năm tới mười phút đầu giờ, tức gần một phần mười thời lượng tiết học.
+Tính trên toàn bộ một học kỳ, phần thời gian đó là đáng kể.
+
+Vấn đề thứ hai nghiêm trọng hơn thời gian: điểm danh thủ công không xác thực
+được danh tính. Một sinh viên có thể ký thay bạn, hoặc dạ thay khi giảng viên
+gọi tên. Bản thân tờ danh sách ký cũng không để lại bằng chứng nào kiểm chứng
+được về sau, nên khi có khiếu nại về kết quả chuyên cần, nhà trường gần như
+không có căn cứ để đối chiếu.
+
+Vấn đề thứ ba nằm ở khâu tổng hợp. Dữ liệu điểm danh nằm rải rác trên giấy
+hoặc trong các tệp bảng tính riêng của từng giảng viên, nên thông thường chỉ
+đến cuối kỳ nhà trường mới biết sinh viên nào vắng quá tỉ lệ cho phép. Khi
+đó sinh viên đã mất quyền dự thi và mọi nhắc nhở đều là quá muộn. Phụ huynh
+lại càng không có kênh nào để theo dõi tình hình học tập của con trong kỳ.
+
+Nhận diện khuôn mặt là hướng giải quyết hợp lý cho ba vấn đề trên, vì khuôn
+mặt là đặc điểm sinh trắc luôn mang theo người, không cần phát thêm thẻ,
+không cần chạm vào thiết bị, và một khung hình chụp cả lớp có thể nhận ra
+nhiều người cùng lúc. Quan trọng hơn, các mô hình nhận diện hiện đại \cite{Wang2021Survey} cho
+phép thêm một người mới chỉ bằng một tấm ảnh, không phải huấn luyện lại, nên
+hệ thống mở rộng được theo từng kỳ tuyển sinh. Đây cũng là bài toán cho phép
+em vận dụng trọn vẹn các kiến thức về học sâu, thị giác máy tính và tìm kiếm
+trên không gian vector đã học trong học phần.
+
+\begin{luuy}
+Đổi lại, dữ liệu khuôn mặt là dữ liệu sinh trắc, thuộc nhóm dữ liệu cá nhân
+nhạy cảm \cite{Luat912025, ND3562025}. Một hệ thống điểm danh bằng khuôn mặt chỉ có ý nghĩa thực tiễn nếu
+đi kèm cơ chế xin phép, phân quyền truy cập và quyền xoá dữ liệu. Ràng buộc
+này được coi là yêu cầu bắt buộc của đồ án, chứ không phải phần làm thêm.
+\end{luuy}
+
+\section{Mục tiêu của đồ án}
+\label{sec:muctieu}
+
+Đồ án đặt ra năm mục tiêu cụ thể, mỗi mục tiêu đều kiểm chứng được và sẽ
+được đối chiếu lại trong Chương~\ref{ch:ketqua}:
+
+\begin{enumerate}[label=\textbf{MT\arabic*.}, leftmargin=3.0em, itemsep=3pt]
+  \item \textbf{Xây dựng được quy trình nhận diện khuôn mặt hoàn chỉnh} từ
+        đăng ký tới điểm danh, chạy được trên máy chủ chỉ có CPU, thời gian
+        xử lý một khung hình đủ nhanh để dùng trực tiếp trong lớp.
+  \item \textbf{Chống được ba kiểu gian lận thường gặp}: điểm danh bằng ảnh
+        in hoặc ảnh chụp lại màn hình, nhận nhầm danh tính do một khung hình
+        xấu, và điểm danh từ xa khi không có mặt tại lớp.
+  \item \textbf{Số hoá trọn vẹn nghiệp vụ quản lý chuyên cần}: hồ sơ sinh
+        viên, lớp học phần, lịch học, phiên điểm danh, sửa điểm danh có lưu
+        vết, cảnh báo vắng, thông báo cho phụ huynh và xuất báo cáo, kèm nhật
+        ký hệ thống ghi lại mọi thao tác quản lý.
+  \item \textbf{Phân quyền đúng mô hình tổ chức của trường} cho quản trị
+        viên, Phòng Đào tạo, Phòng Công tác sinh viên, văn phòng Khoa, lãnh
+        đạo Khoa, ban ngành, giảng viên, sinh viên và phụ huynh, trong đó cán
+        bộ Khoa chỉ thấy dữ liệu thuộc Khoa mình và người nhập liệu tách khỏi
+        người phê duyệt.
+  \item \textbf{Cung cấp một ứng dụng dùng chung cho Web, Android và iOS}
+        từ một mã nguồn duy nhất, kèm bộ kiểm thử tự động chạy trên cơ sở dữ
+        liệu thật để bảo vệ các luồng nghiệp vụ quan trọng.
+\end{enumerate}
+
+\section{Phạm vi và đối tượng}
+
+\textbf{Về bài toán trí tuệ nhân tạo}, đồ án sử dụng mô hình nhận diện khuôn
+mặt đã được tiền huấn luyện thay vì huấn luyện một mô hình mới từ đầu. Lý do
+được phân tích ở Mục~\ref{sec:vosaokhonghuanluyen}. Phần đóng góp của đồ án
+nằm ở quy trình bao quanh mô hình: kiểm tra chất lượng ảnh, chống giả mạo,
+xác nhận đa khung hình, so khớp theo phạm vi lớp và đối chiếu vị trí.
+
+\textbf{Về nghiệp vụ}, đồ án số hoá quy trình điểm danh và quản lý chuyên
+cần. Hệ thống không quản lý điểm học phần, học phí, đăng ký tín chỉ hay
+nhân sự, và không kết nối với phần mềm quản lý đào tạo sẵn có của trường.
+
+\textbf{Về người dùng}, hệ thống phục vụ \FsoVaiTro{} vai trò được liệt kê ở
+Mục~\ref{sec:phanquyen}. Ứng dụng web hướng tới cán bộ và giảng viên, còn
+ứng dụng di động hướng tới sinh viên và phụ huynh.
+
+\textbf{Những gì đồ án không làm}: không nhận diện khi sinh viên đeo khẩu
+trang che quá nửa khuôn mặt; không xử lý được trường hợp anh chị em sinh đôi
+cùng trứng bằng riêng khuôn mặt; không triển khai trên hạ tầng thật của nhà
+trường; và chưa kiểm định mô hình trên tập dữ liệu khuôn mặt người Việt quy
+mô lớn.
+
+\section{Phương pháp thực hiện}
+
+Đồ án được thực hiện theo hướng phát triển lặp \cite{Larman2003Iterative}. Mỗi vòng lặp gồm bốn bước:
+chọn một luồng nghiệp vụ, cài đặt luồng đó ở cả phía dịch vụ lẫn ứng dụng,
+viết kiểm thử tự động cho luồng, rồi chạy thử với dữ liệu mẫu để tìm lỗi
+thực tế. Cách làm này giữ cho hệ thống luôn ở trạng thái chạy được, thay vì
+dồn toàn bộ phần tích hợp vào cuối kỳ.
+
+Toàn bộ mã nguồn được quản lý bằng \code{git}. Tại thời điểm viết báo cáo,
+kho mã nguồn có \FsoCommit{} commit, bản được mô tả trong báo cáo này là
+commit \code{\FcommitCuoi} ngày \FngayCommit.
+
+\begin{ghinho}
+Mọi con số về quy mô hệ thống trong báo cáo này, từ số bảng dữ liệu tới số
+ca kiểm thử, đều được sinh tự động từ chính kho mã nguồn bằng công cụ mô tả
+ở mục C của phần Phụ lục, nên không có số nào là ước lượng bằng tay.
+\end{ghinho}
+
+\section{Bố cục báo cáo}
+
+Phần còn lại của báo cáo được tổ chức như sau. Chương~\ref{ch:coso} trình
+bày cơ sở lý thuyết về nhận diện khuôn mặt, chống giả mạo, tìm kiếm trên
+không gian vector và các công nghệ được sử dụng. Chương~\ref{ch:thietke}
+phân tích yêu cầu và thiết kế kiến trúc, cơ sở dữ liệu, giao diện lập trình
+cùng mô hình phân quyền. Chương~\ref{ch:caidat} mô tả quá trình cài đặt các
+thành phần cốt lõi và giao diện người dùng. Chương~\ref{ch:ketqua} trình bày
+kết quả đạt được, kết quả kiểm thử, đánh giá so với mục tiêu ban đầu, rồi
+tổng kết, nêu bài học rút ra và hướng phát triển.

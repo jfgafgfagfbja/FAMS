@@ -1,0 +1,201 @@
+% ---------------------------------------------------------------------
+%  PHỤ LỤC
+% ---------------------------------------------------------------------
+\chapter{Phụ lục}
+\markboth{Phụ lục}{}
+% Phu luc nam sau \backmatter nen chuong khong duoc danh so va bo dem bang, hinh, doan ma
+% khong ve 0: de nguyen thi bang o day mang so tiep theo cua Chuong 5. Danh so rieng PL.1,
+% PL.2... (ca ban \theH... de lien ket trong PDF khong trung voi bang cua Chuong 5).
+\setcounter{table}{0}\renewcommand{\thetable}{PL.\arabic{table}}\renewcommand{\theHtable}{PL.\arabic{table}}
+\setcounter{figure}{0}\renewcommand{\thefigure}{PL.\arabic{figure}}\renewcommand{\theHfigure}{PL.\arabic{figure}}
+\setcounter{lstlisting}{0}\renewcommand{\thelstlisting}{PL.\arabic{lstlisting}}\renewcommand{\theHlstlisting}{PL.\arabic{lstlisting}}
+
+\section*{A. Hướng dẫn cài đặt và chạy hệ thống}
+\phantomsection
+\addcontentsline{toc}{section}{A. Hướng dẫn cài đặt và chạy hệ thống}
+
+Cách nhanh nhất là dùng Docker, vì hệ thống cần PostgreSQL có phần mở rộng
+pgvector.
+
+\begin{lstlisting}[language=bash, caption={Dựng toàn bộ hệ thống bằng Docker Compose.}]
+# 1. Get the source code
+git clone <repository-url> FAMS
+cd FAMS
+
+# 2. Create the environment file, then edit POSTGRES_PASSWORD and SECRET_KEY
+copy .env.example .env
+
+# 3. Build and start database, backend and web frontend
+docker compose up --build
+
+# 4. Load sample data (units, staff accounts, classes, schedules)
+docker compose exec backend python seed.py
+
+# 5. Open the web application
+#    http://localhost:5173
+\end{lstlisting}
+
+Chạy từng phần khi phát triển:
+
+\begin{lstlisting}[language=bash, caption={Chạy máy chủ và ứng dụng khi phát triển.}]
+# Backend: needs Python 3.10 and a running PostgreSQL with pgvector
+cd backend
+python -m venv venv && venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+alembic upgrade head
+python seed.py
+uvicorn app.main:app --reload --port 8001
+# API documentation: http://localhost:8001/docs
+
+# Flutter app on the web
+cd mobile
+flutter pub get
+flutter run -d chrome --web-port 5174 --dart-define=API_BASE_URL=http://localhost:8001
+
+# Automated tests
+cd backend && pytest
+cd mobile && flutter test
+\end{lstlisting}
+
+\begin{luuy}
+Lần chạy đầu tiên, thư viện InsightFace tự tải bộ mô hình \code{buffalo\_l}
+nặng khoảng 300\,MB, nên cần mạng và một khoảng chờ. Mô hình chống giả mạo
+phải tải riêng và đặt vào \code{backend/models/}; nếu thiếu tệp này, hệ thống
+vẫn chạy nhưng bỏ qua bước kiểm tra chống giả mạo và ghi một dòng cảnh báo.
+Trình duyệt chỉ cho phép dùng camera trên HTTPS hoặc \code{localhost}.
+\end{luuy}
+
+\section*{B. Tài khoản mẫu để chấm và chạy thử}
+\phantomsection
+\addcontentsline{toc}{section}{B. Tài khoản mẫu để chạy thử}
+
+Các tài khoản dưới đây do \code{seed.py} tạo ra, dùng để hội đồng chạy thử
+từng vai trò. Mật khẩu chỉ dành cho môi trường thử nghiệm.
+
+\begin{table}[H]
+\centering
+\caption{Tài khoản mẫu theo từng vai trò.}
+\label{tab:taikhoanmau}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{6.0cm} >{\raggedright\arraybackslash}p{3.0cm} X@{}}
+\toprule
+Tài khoản & Mật khẩu & Vai trò \\
+\midrule
+\code{admin@fams.edu.vn}      & \code{admin123}  & Quản trị viên \\
+\code{pdt01@fams.edu.vn}      & \code{pdt12345}  & Phòng Đào tạo \\
+\code{ctsv01@fams.edu.vn}     & \code{ctsv1234}  & Phòng Công tác sinh viên \\
+\code{khoa.cntt@fams.edu.vn}  & \code{khoa1234}  & Văn phòng Khoa CNTT \\
+\code{ldk.cntt@fams.edu.vn}   & \code{ldk12345}  & Lãnh đạo Khoa CNTT \\
+\code{ban01@fams.edu.vn}      & \code{ban12345}  & Ban ngành \\
+\code{gv01@fams.edu.vn}       & \code{gv123}     & Giảng viên \\
+\code{sv01@fams.edu.vn}       & \code{sv123}     & Sinh viên \\
+\code{ph01@fams.edu.vn}       & \code{ph123}     & Phụ huynh của sv01 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:taikhoanmau}: nên thử gì với từng tài khoản.}
+\label{tab:taikhoanmau-gt}\\
+\toprule
+Tài khoản & Nên thử \\
+\midrule
+\endfirsthead
+\toprule
+Tài khoản & Nên thử \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\code{admin} & Menu đầy đủ, nhật ký hệ thống toàn trường, đặt lại mật khẩu cho mọi tài khoản \\
+\code{pdt01} & Tạo lớp học phần, xếp lịch vào phòng học và thử xếp trùng phòng để thấy bị chặn \\
+\code{ctsv01} & Duyệt khuôn mặt, ghi nhận đồng ý theo bản giấy, duyệt nghỉ có phép, đặt lại mật khẩu sinh viên và phụ huynh \\
+\code{khoa.cntt} & Tạo lớp và lịch trong Khoa CNTT; không có nút duyệt nghỉ có phép \\
+\code{ldk.cntt} & Duyệt nghỉ có phép, xem nhật ký của Khoa; không có nút sửa lớp \\
+\code{ban01} & Chỉ thấy thống kê tổng hợp, không thấy tên hay ảnh sinh viên \\
+\code{gv01} & Mở phiên, quét camera cả lớp, chiếu mã QR, xác nhận tay và sửa điểm danh kèm lý do \\
+\code{sv01} & Đồng ý sinh trắc học, đăng ký khuôn mặt, tự điểm danh bằng link trong mã QR \\
+\code{ph01} & Xem chuyên cần của con, nhận thông báo mỗi lần con được điểm danh \\
+Lưu ý & Các mật khẩu trên chỉ dành cho môi trường thử; bản chạy công khai đã đổi toàn bộ mật khẩu \\
+\end{xltabular}}
+
+\section*{C. Công cụ sinh số liệu cho báo cáo}
+\phantomsection
+\addcontentsline{toc}{section}{C. Công cụ sinh số liệu cho báo cáo}
+
+Mọi con số về quy mô hệ thống trong báo cáo này không gõ tay mà được quét
+trực tiếp từ kho mã nguồn bằng một công cụ nhỏ viết bằng Python.
+
+\begin{lstlisting}[language=bash, caption={Sinh lại số liệu của báo cáo.}]
+# Regenerate every number, table and code excerpt used by the report
+python baocao/tools/quet-du-an.py
+
+# Check only: exits with code 1 when the report data is out of date
+python baocao/tools/quet-du-an.py --kiem-tra
+
+# Static check of the LaTeX sources before compiling
+python baocao/tools/kiem-tra-tex.py
+
+# Measure recognition timings and write them into the report table
+cd backend && python tools/do_hieu_nang.py --anh-mot-mat <image> --ghi
+\end{lstlisting}
+
+Công cụ đọc mã nguồn và sinh ra bốn tệp bảng cùng một tệp định nghĩa các lệnh
+số liệu, đặt trong thư mục \code{baocao/auto/}. Từ đó, số bảng dữ liệu, số
+endpoint, số ca kiểm thử, các ngưỡng cấu hình, các đoạn mã in trong
+Chương~\ref{ch:caidat} và mã commit của bản được mô tả đều lấy thẳng từ hệ
+thống thật. Công cụ cũng so sánh với lần quét trước và ghi ra tệp
+\code{auto/thay-doi.md} liệt kê những gì đã đổi, kèm gợi ý mục nào trong báo
+cáo cần soát lại.
+
+\begin{ghinho}
+Báo cáo này mô tả bản mã nguồn ở nhánh \code{\FnhanhGit}, commit
+\code{\FcommitCuoi}, ngày \FngayCommit. Số liệu được quét lần gần nhất ngày
+\FngayQuet.
+\end{ghinho}
+
+\section*{D. Bảng tự kiểm trước khi nộp}
+\phantomsection
+\addcontentsline{toc}{section}{D. Bảng tự kiểm trước khi nộp}
+
+\begin{tukiem}
+  \item Đã chạy \code{python baocao/tools/quet-du-an.py} lần cuối, số liệu
+        trong báo cáo khớp với mã nguồn nộp kèm.
+  \item Đã tìm chuỗi \emph{CẦN BỔ SUNG} trong tệp PDF và không còn chỗ nào
+        sót lại.
+  \item Đã điền họ tên, mã số sinh viên và lớp ở đầu tệp \code{do-an.tex}.
+  \item Đã chèn ảnh chụp màn hình thật vào \code{figs/} và mở phần hình ở
+        Chương~\ref{ch:caidat}.
+  \item Bảng hiệu năng đã đo lại bằng \code{backend/tools/do\_hieu\_nang.py} trên
+        đúng máy dùng khi bảo vệ; cấu hình máy và ngày đo khớp với báo cáo.
+  \item Hệ thống chạy được trên máy khác, theo đúng các bước ở Mục A.
+  \item Đã chạy thử demo trên đúng môi trường sẽ dùng khi bảo vệ.
+  \item Mọi hình, bảng, giải thuật và mã nguồn đều có chú thích, có nhãn và
+        được nhắc tới trong thân bài.
+  \item Mọi mục tiêu ở Chương~\ref{ch:modau} đều được đối chiếu ở
+        Chương~\ref{ch:ketqua}.
+  \item Mọi tài liệu trong \code{refs.bib} đều được trích dẫn ít nhất một lần.
+  \item Đã khai báo phần nào có dùng công cụ trí tuệ nhân tạo hỗ trợ, và giải
+        thích được toàn bộ hệ thống khi bị hỏi.
+\end{tukiem}
+
+\section*{E. Nhận xét của giảng viên hướng dẫn}
+\phantomsection
+\addcontentsline{toc}{section}{E. Nhận xét của giảng viên hướng dẫn}
+
+\khungnhanxet[7.5cm]
+
+\vspace{0.8em}
+\noindent\begin{minipage}[t]{0.5\textwidth}
+\color{daunavy}
+{\color{daumaroon}\bfseries Điểm số}
+
+\vspace{0.7em}
+\dongchamnhan{Bằng số:}
+
+\vspace{0.9em}
+\dongchamnhan{Bằng chữ:}
+\end{minipage}\hfill
+\okyten{\dauGVHD}{Giảng viên hướng dẫn}

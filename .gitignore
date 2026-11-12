@@ -14,13 +14,35 @@ mobile/.dart_tool/
 
 # Agent skill tooling (installed via `npx skills add`), not part of the app
 .agents/
-.claude/
+.claude/*
 skills-lock.json
+# Ngoai le: skill cap nhat bo bao cao la cua du an, phai theo kho ma nguon
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/bao-cao-fams/
 
 # Bien moi truong that (chi commit .env.example)
 .env
 # Tai lieu/slide sinh rieng, khong thuoc ma nguon
 Claude outputs/
+
+# Tep trung gian khi bien dich bo bao cao LaTeX (giu .tex, .bib, auto/, code/, .pdf)
+baocao/*.aux
+baocao/*.log
+baocao/*.out
+baocao/*.toc
+baocao/*.lof
+baocao/*.lot
+baocao/*.loa
+baocao/*.bbl
+baocao/*.blg
+baocao/*.fls
+baocao/*.fdb_latexmk
+baocao/*.xdv
+baocao/*.synctex.gz
+baocao/*.nav
+baocao/*.snm
+baocao/*.vrb
 
 # Cau hinh may chu that (mat khau, khoa ky)
 deploy/.env

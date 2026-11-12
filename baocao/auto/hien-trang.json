@@ -1,0 +1,581 @@
+{
+  "ngay_quet": "12/11/2026",
+  "git": {
+    "commit": "b099462",
+    "nhanh": "feature/flutter-phan-quyen",
+    "so_commit": "31",
+    "ngay_commit": "05/11/2026"
+  },
+  "api": [
+    {
+      "ten": "audit_logs",
+      "prefix": "/audit-logs",
+      "so_endpoint": 1,
+      "duong_dan": [
+        "GET /"
+      ]
+    },
+    {
+      "ten": "auth",
+      "prefix": "/auth",
+      "so_endpoint": 7,
+      "duong_dan": [
+        "GET /me",
+        "POST /change-password",
+        "POST /forgot-password",
+        "POST /login",
+        "POST /logout",
+        "POST /refresh",
+        "POST /reset-password"
+      ]
+    },
+    {
+      "ten": "classes",
+      "prefix": "/classes",
+      "so_endpoint": 12,
+      "duong_dan": [
+        "DELETE /schedules/{schedule_id}",
+        "DELETE /{class_id}",
+        "DELETE /{class_id}/enroll/{student_id}",
+        "GET /",
+        "GET /{class_id}",
+        "GET /{class_id}/schedules",
+        "GET /{class_id}/students",
+        "PATCH /schedules/{schedule_id}",
+        "PATCH /{class_id}",
+        "POST /",
+        "POST /schedules",
+        "POST /{class_id}/enroll/{student_id}"
+      ]
+    },
+    {
+      "ten": "faces",
+      "prefix": "/faces",
+      "so_endpoint": 6,
+      "duong_dan": [
+        "DELETE /mine",
+        "GET /mine",
+        "GET /pending",
+        "PATCH /{embedding_id}/approve",
+        "PATCH /{embedding_id}/reject",
+        "POST /enroll/{student_id}"
+      ]
+    },
+    {
+      "ten": "lecturers",
+      "prefix": "/lecturers",
+      "so_endpoint": 6,
+      "duong_dan": [
+        "DELETE /{lecturer_id}",
+        "GET /",
+        "GET /me/today-schedules",
+        "PATCH /{lecturer_id}",
+        "POST /",
+        "POST /{lecturer_id}/reset-password"
+      ]
+    },
+    {
+      "ten": "locations",
+      "prefix": "/locations",
+      "so_endpoint": 4,
+      "duong_dan": [
+        "DELETE /{location_id}",
+        "GET /",
+        "PATCH /{location_id}",
+        "POST /"
+      ]
+    },
+    {
+      "ten": "media",
+      "prefix": "/evidence",
+      "so_endpoint": 1,
+      "duong_dan": [
+        "GET /evidence/{file_path:path}"
+      ]
+    },
+    {
+      "ten": "notifications",
+      "prefix": "/notifications",
+      "so_endpoint": 4,
+      "duong_dan": [
+        "GET /",
+        "GET /unread-count",
+        "POST /read-all",
+        "POST /{notification_id}/read"
+      ]
+    },
+    {
+      "ten": "parents",
+      "prefix": "/parents",
+      "so_endpoint": 12,
+      "duong_dan": [
+        "DELETE /{parent_id}",
+        "DELETE /{parent_id}/children/{student_id}",
+        "GET /",
+        "GET /me/children",
+        "GET /me/children/{student_id}/attendance",
+        "GET /me/preferences",
+        "GET /{parent_id}/children",
+        "PATCH /me/preferences",
+        "PATCH /{parent_id}",
+        "POST /",
+        "POST /{parent_id}/children",
+        "POST /{parent_id}/reset-password"
+      ]
+    },
+    {
+      "ten": "reports",
+      "prefix": "/reports",
+      "so_endpoint": 5,
+      "duong_dan": [
+        "GET /attendance/export",
+        "GET /attendance/warnings",
+        "GET /attendance/{class_id}",
+        "GET /my-attendance",
+        "GET /overview"
+      ]
+    },
+    {
+      "ten": "rooms",
+      "prefix": "/rooms",
+      "so_endpoint": 5,
+      "duong_dan": [
+        "DELETE /{room_id}",
+        "GET /",
+        "GET /buildings",
+        "PATCH /{room_id}",
+        "POST /"
+      ]
+    },
+    {
+      "ten": "schedules",
+      "prefix": "/schedules",
+      "so_endpoint": 2,
+      "duong_dan": [
+        "GET /",
+        "GET /week"
+      ]
+    },
+    {
+      "ten": "sessions",
+      "prefix": "/sessions",
+      "so_endpoint": 14,
+      "duong_dan": [
+        "GET /",
+        "GET /{session_id}",
+        "GET /{session_id}/checkin-code",
+        "GET /{session_id}/checkin-info",
+        "GET /{session_id}/records",
+        "GET /{session_id}/records/{record_id}/audits",
+        "GET /{session_id}/roster",
+        "PATCH /{session_id}",
+        "PATCH /{session_id}/close",
+        "PATCH /{session_id}/records/{record_id}",
+        "POST /",
+        "POST /{session_id}/manual",
+        "POST /{session_id}/recognize",
+        "POST /{session_id}/self-checkin"
+      ]
+    },
+    {
+      "ten": "staff",
+      "prefix": "/staff",
+      "so_endpoint": 5,
+      "duong_dan": [
+        "DELETE /{staff_id}",
+        "GET /",
+        "PATCH /{staff_id}",
+        "POST /",
+        "POST /{staff_id}/reset-password"
+      ]
+    },
+    {
+      "ten": "students",
+      "prefix": "/students",
+      "so_endpoint": 12,
+      "duong_dan": [
+        "DELETE /{student_id}",
+        "GET /",
+        "GET /consent-policy",
+        "GET /me",
+        "GET /me/attendance",
+        "GET /{student_id}",
+        "GET /{student_id}/attendance",
+        "PATCH /{student_id}",
+        "POST /",
+        "POST /{student_id}/consent",
+        "POST /{student_id}/consent/withdraw",
+        "POST /{student_id}/reset-password"
+      ]
+    },
+    {
+      "ten": "units",
+      "prefix": "/units",
+      "so_endpoint": 4,
+      "duong_dan": [
+        "DELETE /{unit_id}",
+        "GET /",
+        "PATCH /{unit_id}",
+        "POST /"
+      ]
+    }
+  ],
+  "bang_du_lieu": [
+    {
+      "lop": "User",
+      "bang": "users"
+    },
+    {
+      "lop": "Unit",
+      "bang": "units"
+    },
+    {
+      "lop": "Staff",
+      "bang": "staff"
+    },
+    {
+      "lop": "Student",
+      "bang": "students"
+    },
+    {
+      "lop": "Lecturer",
+      "bang": "lecturers"
+    },
+    {
+      "lop": "Class",
+      "bang": "classes"
+    },
+    {
+      "lop": "Enrollment",
+      "bang": "enrollments"
+    },
+    {
+      "lop": "Location",
+      "bang": "locations"
+    },
+    {
+      "lop": "Room",
+      "bang": "rooms"
+    },
+    {
+      "lop": "Schedule",
+      "bang": "schedules"
+    },
+    {
+      "lop": "AttendanceSession",
+      "bang": "attendance_sessions"
+    },
+    {
+      "lop": "AttendanceRecord",
+      "bang": "attendance_records"
+    },
+    {
+      "lop": "AttendanceAudit",
+      "bang": "attendance_audits"
+    },
+    {
+      "lop": "FaceEmbedding",
+      "bang": "face_embeddings"
+    },
+    {
+      "lop": "RevokedToken",
+      "bang": "revoked_tokens"
+    },
+    {
+      "lop": "RefreshToken",
+      "bang": "refresh_tokens"
+    },
+    {
+      "lop": "PasswordReset",
+      "bang": "password_resets"
+    },
+    {
+      "lop": "Parent",
+      "bang": "parents"
+    },
+    {
+      "lop": "ParentStudent",
+      "bang": "parent_students"
+    },
+    {
+      "lop": "Notification",
+      "bang": "notifications"
+    },
+    {
+      "lop": "AuditLog",
+      "bang": "audit_logs"
+    }
+  ],
+  "cau_hinh": {
+    "DATABASE_URL": {
+      "gia_tri": "postgresql://fams:fams123@localhost:5432/fams",
+      "chu_thich": ""
+    },
+    "SECRET_KEY": {
+      "gia_tri": "change-me",
+      "chu_thich": ""
+    },
+    "ALGORITHM": {
+      "gia_tri": "HS256",
+      "chu_thich": ""
+    },
+    "ACCESS_TOKEN_EXPIRE_MINUTES": {
+      "gia_tri": 480,
+      "chu_thich": ""
+    },
+    "REFRESH_TOKEN_EXPIRE_DAYS": {
+      "gia_tri": 30,
+      "chu_thich": "app mobile dung refresh token de khong bi dang xuat lien tuc"
+    },
+    "RECOGNITION_THRESHOLD": {
+      "gia_tri": 0.45,
+      "chu_thich": "nguong cosine de nhan dien"
+    },
+    "DUPLICATE_THRESHOLD": {
+      "gia_tri": 0.6,
+      "chu_thich": "nguong canh bao trung khi enrollment"
+    },
+    "LATE_AFTER_MINUTES": {
+      "gia_tri": 15,
+      "chu_thich": "sau X phut tinh la muon"
+    },
+    "EARLY_OPEN_MINUTES": {
+      "gia_tri": 15,
+      "chu_thich": "duoc mo phien som X phut truoc gio bat dau tiet"
+    },
+    "SESSION_GRACE_MINUTES": {
+      "gia_tri": 30,
+      "chu_thich": ""
+    },
+    "EVIDENCE_DIR": {
+      "gia_tri": "./evidence",
+      "chu_thich": ""
+    },
+    "EVIDENCE_RETENTION_DAYS": {
+      "gia_tri": 90,
+      "chu_thich": "anh bang chung qua han bi xoa tu dong"
+    },
+    "MEDIA_URL_EXPIRE_MINUTES": {
+      "gia_tri": 60,
+      "chu_thich": ""
+    },
+    "CORS_ORIGINS": {
+      "gia_tri": "http://localhost:5173",
+      "chu_thich": "phan cach boi dau phay"
+    },
+    "ANTISPOOF_ENABLED": {
+      "gia_tri": true,
+      "chu_thich": "bat/tat kiem tra liveness (tat khi may dev yeu)"
+    },
+    "ANTISPOOF_THRESHOLD": {
+      "gia_tri": 0.5,
+      "chu_thich": "diem \"that\" toi thieu de coi la mat that"
+    },
+    "ANTISPOOF_MODEL_PATH": {
+      "gia_tri": "./models/2.7_80x80_MiniFASNetV2.onnx",
+      "chu_thich": ""
+    },
+    "CONFIRM_FRAMES": {
+      "gia_tri": 2,
+      "chu_thich": "so frame can nhan dien du de ghi attendance record"
+    },
+    "SELF_CHECKIN_REQUIRE_LOCATION": {
+      "gia_tri": true,
+      "chu_thich": ""
+    },
+    "SELF_CHECKIN_MAX_ACCURACY_M": {
+      "gia_tri": 100.0,
+      "chu_thich": "sai so GPS lon hon muc nay -> yeu cau thu lai"
+    },
+    "ROOM_MIN_RADIUS_M": {
+      "gia_tri": 50.0,
+      "chu_thich": "Ma QR diem danh doi sau bao nhieu giay. Ngan thi anh chup man hinh nhanh het han,"
+    },
+    "CHECKIN_QR_ROTATE_SECONDS": {
+      "gia_tri": 30,
+      "chu_thich": "Mac dinh cho o \"yeu cau quet ma QR\" khi giang vien mo phien diem danh."
+    },
+    "SELF_CHECKIN_REQUIRE_QR_DEFAULT": {
+      "gia_tri": false,
+      "chu_thich": "Dia chi cong khai cua giao dien web, dung de gan duong link \"xem chi tiet\" vao email"
+    },
+    "APP_PUBLIC_URL": {
+      "gia_tri": "",
+      "chu_thich": "Tac vu nen gui email thong bao: bao lau quet hang doi mot lan, va thu toi da may lan"
+    },
+    "NOTIFY_EMAIL_INTERVAL_SECONDS": {
+      "gia_tri": 15,
+      "chu_thich": ""
+    },
+    "NOTIFY_EMAIL_MAX_ATTEMPTS": {
+      "gia_tri": 3,
+      "chu_thich": ""
+    },
+    "ABSENCE_WARN_RATIO": {
+      "gia_tri": 0.2,
+      "chu_thich": "ti le vang (khong tinh excused) -> canh bao cam thi"
+    },
+    "APP_UTC_OFFSET_MINUTES": {
+      "gia_tri": 420,
+      "chu_thich": "Chong do mat khau: gioi han theo IP (sau nginx can uvicorn --proxy-headers) va"
+    },
+    "LOGIN_RATE_LIMIT": {
+      "gia_tri": "30/minute",
+      "chu_thich": ""
+    },
+    "LOGIN_MAX_FAILED_PER_ACCOUNT": {
+      "gia_tri": 5,
+      "chu_thich": ""
+    },
+    "LOGIN_FAILED_WINDOW_MINUTES": {
+      "gia_tri": 5,
+      "chu_thich": "Tat vong lap nen (don anh, tu dong dong phien) - test dat False de khong dung toi DB that."
+    },
+    "BACKGROUND_JOBS_ENABLED": {
+      "gia_tri": true,
+      "chu_thich": "Quen mat khau (OTP qua email) - SMTP_HOST rong = chua cau hinh, email_service"
+    },
+    "SMTP_HOST": {
+      "gia_tri": "",
+      "chu_thich": ""
+    },
+    "SMTP_PORT": {
+      "gia_tri": 587,
+      "chu_thich": ""
+    },
+    "SMTP_USER": {
+      "gia_tri": "",
+      "chu_thich": ""
+    },
+    "SMTP_PASSWORD": {
+      "gia_tri": "",
+      "chu_thich": ""
+    },
+    "MAIL_FROM": {
+      "gia_tri": "no-reply@fams.edu.vn",
+      "chu_thich": ""
+    },
+    "OTP_EXPIRE_MINUTES": {
+      "gia_tri": 10,
+      "chu_thich": ""
+    }
+  },
+  "test": {
+    "test_admin_crud.py": 16,
+    "test_admin_management.py": 5,
+    "test_antispoof.py": 6,
+    "test_audit_log.py": 12,
+    "test_auth.py": 4,
+    "test_authorization.py": 6,
+    "test_change_password.py": 8,
+    "test_checkin_qr.py": 20,
+    "test_confirm_frames.py": 4,
+    "test_consent.py": 12,
+    "test_evidence_cleanup.py": 2,
+    "test_face_approval.py": 11,
+    "test_flow_fixes.py": 20,
+    "test_location_checkin.py": 13,
+    "test_manager_reset_password.py": 14,
+    "test_my_attendance_detail.py": 6,
+    "test_open_session_rules.py": 12,
+    "test_parent_notifications.py": 17,
+    "test_password_reset.py": 12,
+    "test_reports.py": 3,
+    "test_reports_export_and_warnings.py": 8,
+    "test_rooms.py": 16,
+    "test_session_detail_and_records.py": 11,
+    "test_session_lifecycle.py": 3,
+    "test_tokens_and_media.py": 12,
+    "test_unit_roles.py": 20,
+    "test_week_schedule.py": 5
+  },
+  "man_hinh": {
+    "admin": [
+      "audit_logs_page",
+      "class_detail_page",
+      "classes_page",
+      "face_review_page",
+      "lecturers_page",
+      "locations_page",
+      "parents_page",
+      "rooms_page",
+      "schedules_page",
+      "staff_page",
+      "student_detail_page",
+      "students_page",
+      "units_page"
+    ],
+    "auth": [
+      "account_page",
+      "forgot_password_page",
+      "login_page",
+      "reset_password_page",
+      "splash_page"
+    ],
+    "home": [
+      "home_page"
+    ],
+    "lecturer": [
+      "attendance_scan_page",
+      "checkin_qr_page",
+      "reports_page",
+      "session_records_page",
+      "sessions_page"
+    ],
+    "office": [
+      "overview_page"
+    ],
+    "parent": [
+      "child_attendance_page",
+      "children_page",
+      "notifications_page"
+    ],
+    "schedule": [
+      "schedule_pdf",
+      "week_schedule_page"
+    ],
+    "student": [
+      "enroll_face_page",
+      "enroll_for_student_page",
+      "my_attendance_page",
+      "self_checkin_page"
+    ]
+  },
+  "vai_tro": [
+    "admin",
+    "lecturer",
+    "student",
+    "parent",
+    "training_office",
+    "student_affairs",
+    "faculty_office",
+    "faculty_leader",
+    "board"
+  ],
+  "migration": [
+    "0b5e1a7c2d90",
+    "150e85d92f65",
+    "1d8874f7a39c",
+    "3243764e3dbd",
+    "3425299cc20d",
+    "619a843979a7",
+    "a18f6c2b9e40",
+    "a71c4e9d3b82",
+    "b41f0a7c9d2e",
+    "b8e2d5f1c947",
+    "c3d9f61a84b7",
+    "d4f8a2c6e913",
+    "d7c9a3f21b4e",
+    "e5b8c1d4f7a2",
+    "f7c2a9d1e3b4"
+  ],
+  "ma_trich": {
+    "nhan-dien-khung-hinh.py": "eaa0cc3476",
+    "doi-chieu-vi-tri.py": "a550167484",
+    "loc-pham-vi-sinh-vien.py": "d41f3d1d89"
+  },
+  "dong_python": 6649,
+  "dong_dart": 11190,
+  "dong_test": 4096,
+  "phien_ban_dong_y": "2026-10"
+}

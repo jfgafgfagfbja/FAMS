@@ -1,0 +1,366 @@
+% ---------------------------------------------------------------------
+%  CHƯƠNG 4 — CÀI ĐẶT HỆ THỐNG
+% ---------------------------------------------------------------------
+\chapter{Cài đặt hệ thống}
+\label{ch:caidat}
+
+\begin{muctieu}
+Chương này mô tả môi trường phát triển, cách tổ chức mã nguồn, cài đặt của
+ba thành phần cốt lõi gồm nhận diện khuôn mặt, đối chiếu vị trí và phân
+quyền theo phạm vi, cách cài đặt đồng ý sinh trắc học và nhật ký hệ thống,
+cùng cách ứng dụng đa nền tảng và quy trình triển khai.
+\end{muctieu}
+
+\section{Môi trường phát triển}
+
+\begin{table}[H]
+\centering
+\caption{Môi trường phát triển và triển khai.}
+\label{tab:moitruong}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{4.2cm} X@{}}
+\toprule
+Thành phần & Phiên bản và ghi chú \\
+\midrule
+Ngôn ngữ phía máy chủ & Python 3.10 \\
+Khung dịch vụ & FastAPI, uvicorn, SQLAlchemy 2.0, Alembic \\
+Cơ sở dữ liệu & PostgreSQL 16 kèm phần mở rộng pgvector \\
+Thư viện thị giác & InsightFace \code{buffalo\_l}, OpenCV, ONNX Runtime bản CPU \\
+Ứng dụng & Flutter (Dio, go\_router, provider, camera, geolocator, fl\_chart) \\
+Đóng gói & Docker Compose ba dịch vụ: cơ sở dữ liệu, máy chủ, giao diện \\
+Kiểm thử & pytest chạy trên PostgreSQL thật; \code{flutter test} cho ứng dụng \\
+Máy thử nghiệm & Intel Core i5-1135G7 (4 nhân, 8 luồng), RAM 16\,GB, không dùng GPU \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{3.4cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:moitruong}: vai trò của từng thành phần trong FAMS.}
+\label{tab:moitruong-gt}\\
+\toprule
+Thành phần & Dùng để làm gì \\
+\midrule
+\endfirsthead
+\toprule
+Thành phần & Dùng để làm gì \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+uvicorn & Máy chủ chạy ứng dụng FastAPI \\
+SQLAlchemy 2.0 & Ánh xạ bảng thành lớp Python; sự kiện của nó được dùng để ghi nhật ký hệ thống và sinh thông báo phụ huynh \\
+Alembic & Di trú lược đồ cơ sở dữ liệu, hiện có \FsoMigration{} phiên bản \\
+pgvector & Kiểu \code{Vector(\FchieuVector)}, toán tử khoảng cách cosine và chỉ mục HNSW \\
+InsightFace \code{buffalo\_l} & Bộ năm mô hình: SCRFD phát hiện khuôn mặt, ArcFace trích đặc trưng, và ba mô hình phụ (điểm mốc 2D, điểm mốc 3D, tuổi và giới tính) mà hệ thống không dùng tới, xem Mục~\ref{sec:hieunang} \\
+OpenCV & Giải mã ảnh, cắt vùng khuôn mặt, đo độ sáng và độ nét \\
+ONNX Runtime & Chạy các mô hình trên CPU \\
+Gói Flutter & Dio gọi API và tự làm mới token; go\_router định tuyến và chặn trang theo vai trò; provider giữ trạng thái đăng nhập; camera, geolocator, fl\_chart cho camera, định vị và biểu đồ \\
+Máy thử nghiệm & Windows 11, Python 3.10, ONNX Runtime 1.20 bản CPU; mọi số đo ở Chương~\ref{ch:ketqua} lấy trên máy này \\
+\end{xltabular}}
+
+Không cần GPU. Toàn bộ mô hình chạy qua ONNX Runtime trên CPU, đây là ràng
+buộc tự đặt ra từ đầu, vì một hệ thống đòi hỏi máy chủ có GPU sẽ khó được
+nhà trường triển khai thật.
+
+\section{Tổ chức mã nguồn}
+
+Mã nguồn chia hai phần lớn, tổng cộng khoảng \FsoDongPython{} dòng Python
+cho phía máy chủ và \FsoDongDart{} dòng Dart cho ứng dụng.
+
+\begin{lstlisting}[caption={Cấu trúc thư mục của kho mã nguồn.}, label={lst:caytm}]
+FAMS/
+|-- backend/
+|   |-- alembic/versions/   # database migrations
+|   |-- seed.py             # sample data
+|   |-- tests/              # pytest suite
+|   `-- app/
+|       |-- api/            # HTTP endpoints, grouped by resource
+|       |-- core/           # config, security, authz, signed media URLs
+|       |-- db/             # ORM models and session factory
+|       |-- services/       # face, antispoof, session, geo, audit, notify
+|       `-- schemas.py      # request and response models
+|-- mobile/lib/             # Flutter app for Web, Android, iOS
+|   |-- core/               # api client, auth controller, role matrix
+|   |-- features/           # one folder per role group
+|   `-- widgets/            # shared UI components
+`-- baocao/                 # this report and its generator
+\end{lstlisting}
+
+Tầng \code{api} chỉ nhận yêu cầu, kiểm tra quyền rồi gọi xuống tầng
+\code{services}. Mọi phần liên quan tới mô hình nằm gọn trong
+\code{services}, nên có thể đổi mô hình nhận diện mà không phải chạm vào
+tầng endpoint.
+
+\section{Cài đặt nhận diện khuôn mặt}
+
+Mô hình được nạp theo kiểu trì hoãn: lần gọi đầu tiên mới tải bộ
+\code{buffalo\_l}, những lần sau dùng lại phiên suy luận đã có trong bộ nhớ.
+Nhờ đó máy chủ khởi động nhanh và tiến trình kiểm thử không phải tải mô hình
+khi không cần.
+
+Mã nguồn~\ref{lst:nhandien} là hàm xử lý một khung hình do giảng viên gửi
+lên. Đây là hiện thực của Giải thuật~\ref{alg:nhandien}.
+
+\lstinputlisting[language=Python, caption={Nhận diện toàn bộ khuôn mặt trong
+một khung hình, giới hạn theo lớp học phần (đã lược chú thích).},
+label={lst:nhandien}]{code/nhan-dien-khung-hinh.py}
+
+Ba điểm đáng chú ý trong đoạn mã trên:
+
+\begin{itemize}[leftmargin=1.6em, itemsep=3pt]
+  \item \textbf{Phép so khớp do cơ sở dữ liệu thực hiện.} Biểu thức
+        \code{cosine\_distance} sinh ra toán tử của pgvector, nên việc sắp
+        xếp theo khoảng cách chạy ngay trong PostgreSQL và tận dụng chỉ mục
+        HNSW, thay vì tải toàn bộ vector về máy chủ ứng dụng rồi duyệt.
+  \item \textbf{Điều kiện lọc nằm cùng câu truy vấn.} Phép nối với bảng ghi
+        danh, điều kiện trạng thái \code{approved} và điều kiện
+        \code{consent\_given} khiến không gian tìm kiếm chỉ còn sinh viên của
+        đúng lớp đó, chỉ những khuôn mặt đã được duyệt và chỉ những sinh viên
+        đang đồng ý sử dụng dữ liệu sinh trắc học.
+  \item \textbf{Khuôn mặt nghi giả mạo vẫn được nhận diện.} Hàm không bỏ qua
+        khung hình nghi giả mạo mà vẫn trả về danh tính kèm cờ báo. Quyết
+        định không ghi nhận điểm danh thuộc về tầng endpoint, nhờ vậy giảng
+        viên biết ai đang cố gian lận thay vì chỉ thấy hệ thống im lặng.
+\end{itemize}
+
+Việc ghi nhận điểm danh còn phải qua bộ đếm xác nhận đa khung hình: một sinh
+viên phải được nhận diện đủ \FsoKhungXacNhan{} lần trong cùng một phiên thì
+bản ghi mới được tạo. Bộ đếm lưu trong bộ nhớ theo từng phiên và được dọn khi
+phiên đóng.
+
+\section{Cài đặt đối chiếu vị trí}
+
+Khi sinh viên tự điểm danh, ứng dụng gửi kèm toạ độ, sai số định vị và cờ báo
+vị trí giả lập do hệ điều hành cung cấp. Mã nguồn~\ref{lst:vitri} là phần
+kiểm tra tương ứng.
+
+\lstinputlisting[language=Python, caption={Đối chiếu vị trí khi sinh viên tự
+điểm danh (đã lược chú thích).}, label={lst:vitri}]{code/doi-chieu-vi-tri.py}
+
+Hàm không tự tìm địa điểm mà nhận vào vùng đối chiếu \code{fence} đã được
+chọn sẵn theo thứ tự từ hẹp tới rộng: toạ độ riêng của phòng học, khu vực
+chứa phòng, địa điểm gắn với lịch học, rồi địa điểm mặc định. Khi lấy toạ độ
+riêng của phòng, bán kính được nâng lên tối thiểu \FbanKinhPhong\,m. Tách
+riêng bước chọn vùng giúp hàm kiểm tra chỉ còn một việc là so khoảng cách,
+và dễ kiểm thử với từng loại vùng.
+
+Điểm cần lưu ý là cách xử lý sai số. Định vị trong nhà thường lệch hàng chục
+mét \cite{Zandbergen2011Positional}, nên nếu so thẳng khoảng cách với bán kính thì rất nhiều sinh viên đang
+ngồi trong lớp vẫn bị từ chối. Hệ thống trừ sai số khỏi khoảng cách trước khi
+so sánh, đồng thời từ chối hẳn những báo cáo có sai số lớn hơn
+\FsaiSoGps{}\,m vì khi đó toạ độ không còn giá trị đối chiếu.
+
+\begin{luuy}
+Toạ độ do thiết bị của sinh viên gửi lên nên về nguyên tắc vẫn có thể bị giả
+mạo bằng ứng dụng chuyên dụng. Hệ thống chỉ coi đây là một lớp lọc bổ sung.
+Quyền xác nhận cuối cùng vẫn thuộc về giảng viên đứng lớp.
+\end{luuy}
+
+\section{Cài đặt phân quyền theo phạm vi}
+
+Phạm vi dữ liệu được cài đặt dưới dạng các hàm nhận vào một truy vấn và trả
+về truy vấn đã bị thu hẹp, như Mã nguồn~\ref{lst:phamvi}.
+
+\lstinputlisting[language=Python, caption={Thu hẹp truy vấn danh sách sinh
+viên theo vai trò người đang đăng nhập.}, label={lst:phamvi}]{code/loc-pham-vi-sinh-vien.py}
+
+Cách làm này có ba cái lợi. Thứ nhất, mọi endpoint liệt kê sinh viên đều đi
+qua đúng một hàm, nên không thể quên áp phạm vi ở một chỗ nào đó. Thứ hai,
+điều kiện được đẩy xuống câu lệnh SQL nên không có chuyện tải thừa dữ liệu
+rồi lọc trên máy chủ ứng dụng. Thứ ba, khi một vai trò chưa được khai báo,
+nhánh cuối cùng trả về truy vấn rỗng, tức mặc định là \term{từ chối} chứ
+không phải \term{cho phép}, đúng nguyên tắc mặc định an toàn \en{(fail-safe defaults)} \cite{Saltzer1975Protection}, nhất là khi hệ thống mở rộng.
+
+Hai vai trò cấp Khoa cùng đi qua một nhánh \code{FACULTY\_ROLES}: chúng thấy
+cùng một phạm vi dữ liệu và chỉ khác nhau ở quyền chức năng. Văn phòng Khoa
+được gọi các endpoint sửa lớp học phần, lịch học, ghi danh, nhưng mỗi lần sửa
+đều kiểm tra lớp đó thuộc Khoa mình, còn lớp tạo mới thì tự gán vào Khoa của
+người tạo. Lãnh đạo Khoa không có trong danh sách vai trò được sửa, nhưng là
+vai trò được duyệt nghỉ có phép và xem nhật ký.
+
+\section{Cài đặt đồng ý sinh trắc học và nhật ký hệ thống}
+
+Nội dung đồng ý và số phiên bản \code{\FphienBanDongY} nằm trong một mô-đun
+riêng ở phía máy chủ; ứng dụng chỉ tải về và hiển thị. Điều kiện đã đồng ý
+được kiểm tra ở ba nơi độc lập: endpoint đăng ký khuôn mặt, câu truy vấn chọn
+ứng viên khi quét camera (Mã nguồn~\ref{lst:nhandien}), và endpoint sinh viên
+tự điểm danh. Kiểm tra ở cả ba nơi thay vì chỉ ở bước đăng ký để rút đồng ý
+có hiệu lực tức thì, không phụ thuộc vào việc dữ liệu khuôn mặt đã được xoá
+hết hay chưa.
+
+Nhật ký hệ thống gồm hai phần. Hàm xác thực người dùng của mỗi yêu cầu gắn
+thông tin người đang thao tác và địa chỉ IP vào phiên làm việc với cơ sở dữ
+liệu. Sau đó một hàm lắng nghe sự kiện \code{after\_flush} của SQLAlchemy
+duyệt các đối tượng vừa thêm, sửa, xoá, so lịch sử từng cột để lấy phần thay
+đổi, rồi thêm dòng nhật ký vào cùng giao dịch. Những sự kiện không làm đổi dữ
+liệu như đăng nhập hay xuất báo cáo thì được ghi tường minh tại endpoint
+tương ứng.
+
+\section{Tham số cấu hình}
+
+Toàn bộ ngưỡng và quy tắc nghiệp vụ đều nằm ở tệp cấu hình, khai báo lại được
+bằng biến môi trường, không có hằng số nào chôn trong mã nguồn.
+
+{\scriptsize
+\begin{xltabular}{\textwidth}{@{}>{\raggedright\arraybackslash\leavevmode}p{6.0cm} >{\centering\arraybackslash}p{1.6cm} X@{}}
+\caption{Tham số cấu hình nghiệp vụ và giá trị mặc định.}
+\label{tab:cauhinh}\\
+\toprule
+Tham số & Mặc định & Ý nghĩa \\
+\midrule
+\endfirsthead
+\toprule
+Tham số & Mặc định & Ý nghĩa \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+\BangCauHinh
+\end{xltabular}}
+
+{\footnotesize
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.2cm} >{\raggedright\arraybackslash\leavevmode}p{5.9cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:cauhinh}: các nhóm tham số và tác động khi đổi giá trị.}
+\label{tab:cauhinh-gt}\\
+\toprule
+Nhóm & Tham số & Đổi giá trị thì \\
+\midrule
+\endfirsthead
+\toprule
+Nhóm & Tham số & Đổi giá trị thì \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Nhận diện & \code{RECOGNITION\_THRESHOLD}, \code{DUPLICATE\_THRESHOLD} & Tăng ngưỡng nhận diện thì ít nhận nhầm người hơn nhưng dễ không nhận ra chính chủ; giảm ngưỡng trùng thì chặn đăng ký hai danh tính chặt hơn nhưng dễ báo nhầm hai người giống nhau \\
+Chống giả mạo & \code{ANTISPOOF\_ENABLED}, \code{ANTISPOOF\_THRESHOLD} & Tăng ngưỡng thì chặn ảnh giả chặt hơn nhưng dễ chặn nhầm người thật khi thiếu sáng \\
+Xác nhận & \code{CONFIRM\_FRAMES} & Tăng thì chắc chắn hơn nhưng ghi nhận chậm hơn \\
+Giờ giấc phiên & \code{EARLY\_OPEN\_MINUTES}, \code{LATE\_AFTER\_MINUTES}, \code{SESSION\_GRACE\_MINUTES} & Theo quy định của nhà trường về giờ mở điểm danh, đi muộn và hạn chót \\
+Vị trí & \code{SELF\_CHECKIN\_REQUIRE\_LOCATION}, \code{SELF\_CHECKIN\_MAX\_ACCURACY\_M}, \code{ROOM\_MIN\_RADIUS\_M} & Nới ra thì ít từ chối oan sinh viên ngồi trong phòng, nhưng dễ điểm danh từ xa hơn \\
+Mã QR & \code{CHECKIN\_QR\_ROTATE\_SECONDS}, \code{SELF\_CHECKIN\_REQUIRE\_QR\_DEFAULT} & Chu kỳ ngắn thì ảnh chụp mã hết hạn nhanh hơn, nhưng sinh viên quét chậm dễ bị trượt \\
+Đăng nhập & \code{ACCESS\_TOKEN\_EXPIRE\_MINUTES}, \code{REFRESH\_TOKEN\_EXPIRE\_DAYS}, các tham số \code{LOGIN\_...}, \code{OTP\_EXPIRE\_MINUTES} & Thời hạn ngắn và giới hạn chặt thì an toàn hơn nhưng người dùng phải đăng nhập lại nhiều hơn \\
+Dữ liệu, thông báo & \code{EVIDENCE\_RETENTION\_DAYS}, \code{MEDIA\_URL\_EXPIRE\_MINUTES}, \code{ABSENCE\_WARN\_RATIO}, \code{NOTIFY\_EMAIL\_...}, \code{APP\_PUBLIC\_URL} & Thời gian giữ ảnh, hạn của đường dẫn ảnh, ngưỡng cảnh báo cấm thi, cách gửi email và địa chỉ gắn vào link \\
+Cách đặt & -- & Đặt biến môi trường cùng tên hoặc ghi vào tệp \code{backend/.env}, rồi khởi động lại máy chủ \\
+\end{xltabular}}
+
+Việc tách bạch như vậy cho phép điều chỉnh hệ thống theo thực tế từng đơn vị
+mà không phải sửa mã: một khoa muốn siết ngưỡng nhận diện, một cơ sở có phòng
+học trải rộng muốn nới bán kính điểm danh, đều chỉ là đổi giá trị cấu hình.
+
+\section{Ứng dụng đa nền tảng}
+
+Ứng dụng Flutter dùng chung một mã nguồn cho ba nền tảng, gồm
+\FsoManHinh{} màn hình chia theo \FsoNhomManHinh{} nhóm vai trò. Điều hướng
+do \code{go\_router} đảm nhiệm và chặn ngay ở tầng định tuyến: một tài khoản
+sinh viên gõ thẳng đường dẫn của trang quản trị sẽ bị đưa về trang chủ, không
+phụ thuộc vào việc menu có hiển thị mục đó hay không. Menu của mỗi vai trò
+được xếp theo ma trận ở Bảng~\ref{tab:phanquyen}: việc chính của nhóm đứng
+đầu, tiếp đến dữ liệu chỉ xem, nên văn phòng Khoa mở ứng dụng là thấy lớp và
+lịch, còn lãnh đạo Khoa thấy báo cáo, duyệt phép và nhật ký.
+
+Bố cục được thiết kế theo cổng thông tin sinh viên của trường để người dùng
+không phải làm quen lại. Trên màn hình rộng, thanh trên cùng có logo, ô tìm
+nhanh chức năng, chuông thông báo và tài khoản; menu chia nhóm được giấu sau
+một nút dính ở mép trái và chỉ trượt ra khi cần, nhờ vậy nội dung dùng trọn
+chiều ngang. Trang chủ của mọi vai trò xếp thành ba tầng: thẻ thông tin cá
+nhân bên cạnh các ô số, hàng lối tắt tới chức năng của vai trò đó, rồi các
+thẻ biểu đồ và bảng. Trên điện thoại, ứng dụng dùng thanh điều hướng dưới
+hoặc ngăn kéo, và với sinh viên thì thẻ lịch hôm nay được đưa lên ngay sau
+thẻ thông tin, vì tự điểm danh là việc chính khi mở ứng dụng trên điện thoại.
+
+\begin{table}[H]
+\centering
+\caption{Các nhóm màn hình chính của ứng dụng.}
+\label{tab:manhinh}
+\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{3.0cm} X@{}}
+\toprule
+Nhóm & Màn hình tiêu biểu \\
+\midrule
+Xác thực & Đăng nhập, quên mật khẩu bằng OTP, đặt lại và đổi mật khẩu, tài
+  khoản kèm danh sách chức năng của vai trò \\
+Sinh viên & Lịch tuần, đồng ý sinh trắc học, đăng ký khuôn mặt, tự điểm danh
+  kèm quét mã QR, chuyên cần của tôi \\
+Giảng viên & Phiên điểm danh, quét camera cả lớp, chiếu mã QR, kết quả phiên,
+  báo cáo \\
+Phụ huynh & Danh sách con, chuyên cần của từng con, hộp thư thông báo \\
+Phòng ban & Thống kê tổng hợp theo Khoa và theo lớp, nhật ký của Khoa \\
+Quản trị & Sinh viên, giảng viên, lớp học phần, lịch, phòng học, địa điểm,
+  duyệt khuôn mặt, phụ huynh, đơn vị, cán bộ, đặt lại mật khẩu, nhật ký hệ
+  thống \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+{\small
+\begin{xltabular}{\textwidth}{@{}>{\bfseries\raggedright\arraybackslash\leavevmode}p{2.6cm} >{\raggedright\arraybackslash\leavevmode}p{4.6cm} >{\raggedright\arraybackslash\leavevmode}X@{}}
+\caption{Giải thích chi tiết Bảng~\ref{tab:manhinh}: ai dùng nhóm màn hình nào và đường dẫn tiêu biểu.}
+\label{tab:manhinh-gt}\\
+\toprule
+Nhóm & Ai dùng & Đường dẫn tiêu biểu \\
+\midrule
+\endfirsthead
+\toprule
+Nhóm & Ai dùng & Đường dẫn tiêu biểu \\
+\midrule
+\endhead
+\bottomrule
+\endfoot
+Xác thực & Mọi vai trò & \code{/login}, \code{/forgot-password}, \code{/account} \\
+Sinh viên & Sinh viên & \code{/}, \code{/schedule}, \code{/my-attendance}, \code{/face}, \code{/self-checkin/:id} \\
+Giảng viên & Giảng viên & \code{/sessions}, \code{/sessions/:id/scan}, \code{/sessions/:id/qr}, \code{/reports} \\
+Phụ huynh & Phụ huynh & \code{/}, \code{/notifications}, \code{/children/:id} \\
+Phòng ban & Phòng Đào tạo, Phòng Công tác sinh viên, văn phòng và lãnh đạo Khoa, ban ngành & \code{/}, \code{/reports}, \code{/audit-logs} cho lãnh đạo Khoa \\
+Quản trị & Quản trị viên; nhiều trang dùng chung với phòng ban & \code{/students}, \code{/classes}, \code{/rooms}, \code{/staff}, \code{/units}, \code{/audit-logs} \\
+Ghi chú & -- & Đường dẫn ngoài quyền của vai trò bị chặn ở tầng định tuyến và đưa về trang chủ \\
+\end{xltabular}}
+
+Ứng dụng tự làm mới access token khi hết hạn: lớp gọi API bắt mã lỗi 401, gọi
+endpoint làm mới rồi phát lại yêu cầu ban đầu, nên người dùng không bị đăng
+xuất giữa chừng. Token lưu bằng kho lưu trữ an toàn của hệ điều hành.
+
+Hình~\ref{fig:tudiemdanh} là luồng tự điểm danh chạy thật trên điện thoại,
+Hình~\ref{fig:sinhvien} là các màn hình chính của sinh viên và phụ huynh,
+Hình~\ref{fig:tongquan} là màn hình tổng quan của phòng ban.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.35\textwidth]{kq-ma-qr.png}\hfill
+\includegraphics[width=0.205\textwidth]{kq-tu-dd-1.png}\hfill
+\includegraphics[width=0.205\textwidth]{kq-tu-dd-2.png}\hfill
+\includegraphics[width=0.205\textwidth]{kq-tu-dd-3.png}
+\caption{Giảng viên chiếu mã QR, sinh viên đối chiếu vị trí, chụp ảnh và nhận
+kết quả.}
+\label{fig:tudiemdanh}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[height=7.6cm]{kq-sv-trang-chu.png}\hfill
+\includegraphics[height=7.6cm]{kq-sv-chuyen-can.png}\hfill
+\includegraphics[height=7.6cm]{kq-sv-khuon-mat.png}\hfill
+\includegraphics[height=7.6cm]{kq-ph-thong-bao.png}
+\caption{Trang chủ, chuyên cần, dữ liệu khuôn mặt của sinh viên và thông báo
+của phụ huynh.}
+\label{fig:sinhvien}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{kq-tong-quan.png}
+\caption{Màn hình tổng quan chuyên cần của Phòng Đào tạo.}
+\label{fig:tongquan}
+\end{figure}
+
+\section{Triển khai}
+
+Toàn bộ hệ thống dựng lại được bằng một lệnh \code{docker compose up
+-{}-build}, gồm ba dịch vụ: cơ sở dữ liệu PostgreSQL có sẵn pgvector, máy chủ
+ứng dụng tự chạy di trú cơ sở dữ liệu trước khi phục vụ, và nginx phục vụ bản
+Flutter Web đồng thời chuyển tiếp các yêu cầu API.
+
+Hai lưu ý khi triển khai thật. Thứ nhất, cổng của cơ sở dữ liệu và máy chủ
+chỉ mở trên máy cục bộ, người dùng đi vào qua nginx. Thứ hai, trình duyệt chỉ
+cho phép truy cập camera trên HTTPS hoặc \code{localhost}, nên bản triển khai
+thật bắt buộc phải có chứng chỉ HTTPS.
